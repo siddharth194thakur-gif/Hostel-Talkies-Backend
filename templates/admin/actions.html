@@ -1,0 +1,32 @@
+{% load i18n %}
+<div class="actions ht-modern-actions-toolbar" id="ht-actions-toolbar">
+  {% block actions %}
+    <div class="ht-actions-container">
+      <div class="ht-actions-left">
+        <div class="ht-selection-pill" id="ht-selection-pill">
+          <span class="ht-selection-icon">✓</span>
+          <span class="ht-selection-counter" id="ht-selection-count">0</span>
+          <span class="ht-selection-label">selected</span>
+        </div>
+        <button type="button" class="ht-btn-select-all" id="ht-select-all-btn" title="Select all items across this page">
+          Select All
+        </button>
+      </div>
+
+      <div class="ht-actions-right">
+        <!-- Native Django Action Elements (kept accessible & synchronized) -->
+        <div class="ht-native-action-wrap">
+          {% for field in action_form %}{% if field.label %}<label class="ht-action-label">{{ field.label }} {% endif %}{{ field }}{% if field.label %}</label>{% endif %}{% endfor %}
+          <button type="submit" class="ht-btn-action-go" title="{% translate "Run the selected action" %}" name="index" value="{{ action_index|default:0 }}" id="ht-action-go-btn">
+            <span>Apply Action</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        {% if cl.formset and cl.result_count %}
+          <input type="hidden" name="_save" value="{% translate 'Save' %}">
+        {% endif %}
+      </div>
+    </div>
+  {% endblock %}
+</div>

@@ -1,0 +1,29 @@
+{% load i18n static %}
+{% if cl.search_fields %}
+<div id="toolbar" class="ht-search-toolbar">
+  <form id="changelist-search" method="get" class="ht-search-form">
+    <div class="ht-search-input-group">
+      <span class="ht-search-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+      <input type="text" size="40" name="{{ search_var }}" value="{{ cl.query }}" id="searchbar" class="ht-search-input" placeholder="Search {{ cl.opts.verbose_name_plural|lower }}..." aria-label="{% translate 'Search' %}">
+      {% if cl.query %}
+        <a href="?" class="ht-search-clear" title="Clear search query">✕</a>
+      {% endif %}
+      <button type="submit" class="ht-search-btn">Search</button>
+    </div>
+    {% if show_result_count %}
+      <div class="ht-search-count-badge">
+        <span class="ht-search-count-num">{% blocktranslate count counter=cl.result_count %}{{ counter }} result{% plural %}{{ counter }} results{% endblocktranslate %}</span>
+        {% if cl.result_count != cl.full_result_count %}
+          <span class="ht-search-count-total">({% blocktranslate with full_result_count=cl.full_result_count %}{{ full_result_count }} total{% endblocktranslate %})</span>
+          <a href="?" class="ht-search-reset-link">Show All</a>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% for pair in cl.params.items %}
+      {% if pair.0 != search_var %}<input type="hidden" name="{{ pair.0 }}" value="{{ pair.1 }}">{% endif %}
+    {% endfor %}
+  </form>
+</div>
+{% endif %}

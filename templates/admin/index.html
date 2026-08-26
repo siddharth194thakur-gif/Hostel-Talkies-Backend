@@ -1,0 +1,532 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_dashboard_stats %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/hosteltalkies_admin.css' %}">
+{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+{% block bodyclass %}{{ block.super }} dashboard ht-dashboard-page{% endblock %}
+
+{% block content %}
+{% get_dashboard_stats as stats %}
+
+<div class="ht-dashboard-container">
+  <!-- 1. Hero Operations Banner -->
+  <div class="ht-hero-banner">
+    <div class="ht-hero-content">
+      <div class="ht-hero-pill">
+        <span class="ht-pulse-dot"></span>
+        <span>HostelTalkies Admin Operations Center</span>
+      </div>
+      <h1 class="ht-hero-title">Welcome back, {{ user.first_name|default:user.username }}</h1>
+      <p class="ht-hero-desc">
+        Comprehensive overview of student residents, hostel infrastructure, marketplace listings, notices, and moderation triage across the campus network.
+      </p>
+      
+      <div class="ht-hero-actions">
+        <a href="{% url 'admin:study_studyresource_add' %}" class="ht-btn ht-btn-white" style="background:#7c3aed; color:#ffffff; border-color:#7c3aed;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span>+ Upload Study Resource</span>
+        </a>
+        <a href="{% url 'admin:users_student_add' %}" class="ht-btn ht-btn-white">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+          <span>+ Enroll Student</span>
+        </a>
+        <a href="{% url 'admin:notices_notice_add' %}" class="ht-btn ht-btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span>+ Broadcast Notice</span>
+        </a>
+        <a href="{% url 'admin:hostels_hostel_changelist' %}" class="ht-btn ht-btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect></svg>
+          <span>Manage Hostels</span>
+        </a>
+      </div>
+    </div>
+    <div class="ht-hero-watermark">HT</div>
+  </div>
+
+  <!-- 2. Grouped Primary Metric KPI Cards -->
+  <div class="ht-kpi-section">
+    <div class="ht-section-header">
+      <div>
+        <h2 class="ht-section-title">Campus Key Performance Indicators</h2>
+        <p class="ht-section-subtitle">Real-time counts and metrics aggregated from the active database</p>
+      </div>
+      <div class="ht-badge-live">
+        <span class="ht-live-indicator"></span> Real Data
+      </div>
+    </div>
+
+    <!-- KPI Grid -->
+    <div class="ht-kpi-grid">
+      <!-- Users & Roles -->
+      <a href="{% url 'admin:users_student_changelist' %}" class="ht-kpi-card" style="border-top: 3px solid #4f46e5;">
+        <div class="ht-kpi-header">
+          <span class="ht-kpi-label">Total Students</span>
+          <div class="ht-kpi-icon" style="background:#eef2ff; color:#4f46e5;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+          </div>
+        </div>
+        <div class="ht-kpi-value">{{ stats.total_students }}</div>
+        <div class="ht-kpi-meta">
+          <span class="text-success">{{ stats.active_students }} Active</span>
+          {% if stats.blocked_students > 0 or stats.suspended_students > 0 %}
+          <span class="text-danger">• {{ stats.blocked_students|add:stats.suspended_students }} Restricted</span>
+          {% endif %}
+        </div>
+      </a>
+
+      <!-- Hostels & Blocks -->
+      <a href="{% url 'admin:hostels_hostel_changelist' %}" class="ht-kpi-card" style="border-top: 3px solid #0284c7;">
+        <div class="ht-kpi-header">
+          <span class="ht-kpi-label">Active Hostels</span>
+          <div class="ht-kpi-icon" style="background:#e0f2fe; color:#0284c7;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect></svg>
+          </div>
+        </div>
+        <div class="ht-kpi-value">{{ stats.active_hostels }} <span class="text-muted" style="font-size:14px; font-weight:normal;">/ {{ stats.total_hostels }}</span></div>
+        <div class="ht-kpi-meta">
+          <span>{{ stats.total_blocks }} Blocks • {{ stats.total_rooms }} Rooms</span>
+        </div>
+      </a>
+
+      <!-- Marketplace & Posts -->
+      <a href="{% url 'admin:posts_post_changelist' %}" class="ht-kpi-card" style="border-top: 3px solid #10b981;">
+        <div class="ht-kpi-header">
+          <span class="ht-kpi-label">Marketplace Posts</span>
+          <div class="ht-kpi-icon" style="background:#dcfce7; color:#10b981;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path></svg>
+          </div>
+        </div>
+        <div class="ht-kpi-value">{{ stats.active_posts }} <span class="text-muted" style="font-size:14px; font-weight:normal;">/ {{ stats.total_posts }}</span></div>
+        <div class="ht-kpi-meta">
+          <span>{{ stats.giveaway_posts }} Free • {{ stats.total_borrows }} Borrows</span>
+        </div>
+      </a>
+
+      <!-- Study Resources -->
+      <a href="{% url 'admin:study_studyresource_changelist' %}" class="ht-kpi-card" style="border-top: 3px solid #8b5cf6;">
+        <div class="ht-kpi-header">
+          <span class="ht-kpi-label">Study Notes & PYQs</span>
+          <div class="ht-kpi-icon" style="background:#ede9fe; color:#8b5cf6;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          </div>
+        </div>
+        <div class="ht-kpi-value">{{ stats.total_study }}</div>
+        <div class="ht-kpi-meta">
+          <span>{{ stats.notes_count }} Notes • {{ stats.pyqs_count }} PYQs</span>
+        </div>
+      </a>
+
+      <!-- Notices -->
+      <a href="{% url 'admin:notices_notice_changelist' %}" class="ht-kpi-card" style="border-top: 3px solid #f59e0b;">
+        <div class="ht-kpi-header">
+          <span class="ht-kpi-label">Active Notices</span>
+          <div class="ht-kpi-icon" style="background:#fef3c7; color:#f59e0b;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </div>
+        </div>
+        <div class="ht-kpi-value">{{ stats.active_notices }}</div>
+        <div class="ht-kpi-meta">
+          {% if stats.urgent_notices > 0 %}
+          <span class="text-danger" style="font-weight:600;">{{ stats.urgent_notices }} Urgent</span>
+          {% else %}
+          <span>All Hostels Broadcasted</span>
+          {% endif %}
+        </div>
+      </a>
+
+      <!-- Events -->
+      <a href="{% url 'admin:events_event_changelist' %}" class="ht-kpi-card" style="border-top: 3px solid #ec4899;">
+        <div class="ht-kpi-header">
+          <span class="ht-kpi-label">Upcoming Events</span>
+          <div class="ht-kpi-icon" style="background:#fce7f3; color:#ec4899;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>
+          </div>
+        </div>
+        <div class="ht-kpi-value">{{ stats.upcoming_events_count }}</div>
+        <div class="ht-kpi-meta">
+          <span>{{ stats.total_events }} Total Scheduled</span>
+        </div>
+      </a>
+
+      <!-- Moderation Reports -->
+      <a href="{% url 'admin:moderation_report_changelist' %}" class="ht-kpi-card" style="border-top: 3px solid {% if stats.pending_reports > 0 %}#ef4444{% else %}#10b981{% endif %};">
+        <div class="ht-kpi-header">
+          <span class="ht-kpi-label">Pending Reports</span>
+          <div class="ht-kpi-icon" style="background:{% if stats.pending_reports > 0 %}#fee2e2; color:#ef4444;{% else %}#dcfce7; color:#10b981;{% endif %}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+          </div>
+        </div>
+        <div class="ht-kpi-value" style="{% if stats.pending_reports > 0 %}color:#dc2626;{% endif %}">{{ stats.pending_reports }}</div>
+        <div class="ht-kpi-meta">
+          <span>{{ stats.resolved_reports }} Resolved • {{ stats.total_reports }} Total</span>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- 3. Dynamic Hostel Overview Section (Requirement 5) -->
+  <div class="ht-card" style="margin-bottom: 28px;">
+    <div class="ht-card-header">
+      <div>
+        <h2 class="ht-card-title">Campus Hostels & Residential Buildings</h2>
+        <p class="ht-card-subtitle">Live infrastructure metrics, block occupancy, and assigned wardens</p>
+      </div>
+      <a href="{% url 'admin:hostels_hostel_changelist' %}" class="ht-btn ht-btn-outline" style="font-size:13px; padding: 6px 14px;">
+        View All Hostels →
+      </a>
+    </div>
+    <div class="ht-card-body">
+      {% if stats.hostels_summary %}
+      <div class="ht-hostel-grid">
+        {% for h in stats.hostels_summary %}
+        <div class="ht-hostel-tile">
+          <div class="ht-hostel-top">
+            <div>
+              <h3 class="ht-hostel-name">{{ h.name }}</h3>
+              <div class="ht-hostel-tags">
+                <span class="badge badge-secondary">{{ h.code }}</span>
+                <span class="badge badge-purple">{{ h.gender|upper }}</span>
+                {% if h.is_active %}
+                <span class="badge badge-success">ACTIVE</span>
+                {% else %}
+                <span class="badge badge-danger">INACTIVE</span>
+                {% endif %}
+              </div>
+            </div>
+            <a href="{% url 'admin:hostels_hostel_change' h.id %}" class="ht-hostel-edit-btn" title="Edit Hostel">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            </a>
+          </div>
+
+          <div class="ht-hostel-warden-box">
+            <span class="ht-hostel-warden-label">Warden In-Charge:</span>
+            <span class="ht-hostel-warden-name">{{ h.warden_name }}</span>
+            <span class="ht-hostel-warden-phone">📞 {{ h.warden_contact }}</span>
+          </div>
+
+          <div class="ht-hostel-stats-row">
+            <div class="ht-hostel-stat-box">
+              <span class="ht-hostel-stat-val">{{ h.blocks_count }}</span>
+              <span class="ht-hostel-stat-lbl">Blocks</span>
+            </div>
+            <div class="ht-hostel-stat-box">
+              <span class="ht-hostel-stat-val">{{ h.rooms_count }}</span>
+              <span class="ht-hostel-stat-lbl">Rooms</span>
+            </div>
+            <div class="ht-hostel-stat-box">
+              <span class="ht-hostel-stat-val" style="color:#4f46e5;">{{ h.students_count }}</span>
+              <span class="ht-hostel-stat-lbl">Residents</span>
+            </div>
+            <div class="ht-hostel-stat-box">
+              <span class="ht-hostel-stat-val">{{ h.capacity }}</span>
+              <span class="ht-hostel-stat-lbl">Capacity</span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="ht-empty-state">
+        <p>No hostels configured in the database yet.</p>
+        <a href="{% url 'admin:hostels_hostel_add' %}" class="ht-btn ht-btn-primary">+ Add First Hostel</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 4. Operations Split Grid (Recent Activity & Moderation) -->
+  <div class="ht-split-grid">
+    <!-- Left Column: Student Registrations & Marketplace Feeds -->
+    <div class="ht-split-col">
+      <!-- Recent Student Registrations -->
+      <div class="ht-card">
+        <div class="ht-card-header">
+          <div>
+            <h2 class="ht-card-title">Recent Student Registrations</h2>
+            <p class="ht-card-subtitle">Newly enrolled residents on the platform</p>
+          </div>
+          <a href="{% url 'admin:users_student_changelist' %}" class="ht-card-action">View All ({{ stats.total_students }}) →</a>
+        </div>
+        <div class="ht-card-body p-0">
+          {% if stats.recent_students %}
+          <div class="ht-table-responsive">
+            <table class="ht-mini-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Hostel / Room</th>
+                  <th>Joined</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for st in stats.recent_students %}
+                <tr>
+                  <td>
+                    <div class="ht-user-cell">
+                      <div class="ht-avatar-sm">{{ st.first_name|default:st.username|slice:":1"|upper }}</div>
+                      <div>
+                        <div class="ht-user-cell-name">{{ st.get_full_name|default:st.username }}</div>
+                        <div class="ht-user-cell-email">{{ st.email }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    {% if st.profile and st.profile.hostel %}
+                    <span class="ht-hostel-pill">{{ st.profile.hostel.name }}</span>
+                    {% if st.profile.room %}
+                    <span class="text-muted" style="font-size:12px;">R-{{ st.profile.room.room_number }}</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted" style="font-size:12px;">{{ st.date_joined|date:"M d, Y" }}</td>
+                  <td>
+                    {% if st.is_blocked %}
+                    <span class="badge badge-danger">BLOCKED</span>
+                    {% elif st.is_suspended %}
+                    <span class="badge badge-warning">SUSPENDED</span>
+                    {% else %}
+                    <span class="badge badge-success">ACTIVE</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="ht-empty-state"><p>No student accounts found.</p></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Recent Marketplace Listings -->
+      <div class="ht-card">
+        <div class="ht-card-header">
+          <div>
+            <h2 class="ht-card-title">Recent Marketplace & Community Posts</h2>
+            <p class="ht-card-subtitle">Active student listings and giveaways</p>
+          </div>
+          <a href="{% url 'admin:posts_post_changelist' %}" class="ht-card-action">Manage Posts →</a>
+        </div>
+        <div class="ht-card-body p-0">
+          {% if stats.recent_posts %}
+          <div class="ht-table-responsive">
+            <table class="ht-mini-table">
+              <thead>
+                <tr>
+                  <th>Post Title</th>
+                  <th>Type</th>
+                  <th>Seller</th>
+                  <th>Price</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in stats.recent_posts %}
+                <tr>
+                  <td>
+                    <a href="{% url 'admin:posts_post_change' p.id %}" class="ht-table-link">
+                      {{ p.title|truncatechars:35 }}
+                    </a>
+                  </td>
+                  <td>
+                    {% if p.post_type == "giveaway" %}
+                    <span class="badge badge-success">FREE</span>
+                    {% elif p.post_type == "buy_sell" %}
+                    <span class="badge badge-primary">BUY/SELL</span>
+                    {% elif p.post_type == "borrow" %}
+                    <span class="badge badge-warning">BORROW</span>
+                    {% else %}
+                    <span class="badge badge-secondary">{{ p.post_type|upper }}</span>
+                    {% endif %}
+                  </td>
+                  <td style="font-size:12px;">{{ p.author.get_full_name|default:p.author.username }}</td>
+                  <td style="font-weight:600; color:#4338ca;">
+                    {% if p.post_type == "giveaway" or not p.price %}FREE{% else %}₹{{ p.price }}{% endif %}
+                  </td>
+                  <td>
+                    {% if p.is_hidden %}
+                    <span class="badge badge-warning">HIDDEN</span>
+                    {% elif p.status == "available" %}
+                    <span class="badge badge-success">AVAILABLE</span>
+                    {% elif p.status == "sold" %}
+                    <span class="badge badge-info">SOLD</span>
+                    {% else %}
+                    <span class="badge badge-secondary">{{ p.status|upper }}</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="ht-empty-state"><p>No marketplace listings posted yet.</p></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Upcoming Events & Priority Notices -->
+      <div class="ht-card">
+        <div class="ht-card-header">
+          <div>
+            <h2 class="ht-card-title">Priority Notices & Circulars</h2>
+            <p class="ht-card-subtitle">Active announcements broadcast to hostels</p>
+          </div>
+          <a href="{% url 'admin:notices_notice_changelist' %}" class="ht-card-action">All Notices →</a>
+        </div>
+        <div class="ht-card-body p-0">
+          {% if stats.active_priority_notices %}
+          <div class="ht-notice-list">
+            {% for n in stats.active_priority_notices %}
+            <div class="ht-notice-item">
+              <div class="ht-notice-item-top">
+                <span class="ht-notice-item-title">{{ n.title }}</span>
+                {% if n.priority == "urgent" %}
+                <span class="badge badge-danger">URGENT</span>
+                {% elif n.priority == "important" %}
+                <span class="badge badge-warning">IMPORTANT</span>
+                {% else %}
+                <span class="badge badge-secondary">NORMAL</span>
+                {% endif %}
+              </div>
+              <div class="ht-notice-item-meta">
+                <span>🎯 {% if n.target_hostel %}{{ n.target_hostel.name }}{% else %}All Hostels{% endif %}</span>
+                <span>📅 {{ n.publish_date|date:"M d, Y" }}</span>
+                <span>✍️ {{ n.created_by.get_full_name|default:"Admin" }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="ht-empty-state"><p>No active notices published.</p></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Moderation, Incidents, and Audit Trail -->
+    <div class="ht-split-col">
+      <!-- Moderation & Reports Triage -->
+      <div class="ht-card">
+        <div class="ht-card-header">
+          <div>
+            <h2 class="ht-card-title">Moderation & Incident Reports</h2>
+            <p class="ht-card-subtitle">Flagged content, complaints, and student reports</p>
+          </div>
+          <a href="{% url 'admin:moderation_report_changelist' %}" class="ht-card-action">
+            Triage Reports ({{ stats.pending_reports }}) →
+          </a>
+        </div>
+        <div class="ht-card-body p-0">
+          {% if stats.recent_reports %}
+          <div class="ht-table-responsive">
+            <table class="ht-mini-table">
+              <thead>
+                <tr>
+                  <th>Target</th>
+                  <th>Reason</th>
+                  <th>Reporter</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in stats.recent_reports %}
+                <tr>
+                  <td>
+                    <span class="badge badge-purple">{{ r.report_type|upper }}</span>
+                    <span class="text-muted" style="font-size:11px;">#{{ r.target_id }}</span>
+                  </td>
+                  <td style="font-size:12px; font-weight:600;">{{ r.get_reason_display|default:r.reason }}</td>
+                  <td style="font-size:11px;" class="text-muted">{{ r.reporter.email|default:"Anonymous" }}</td>
+                  <td>
+                    {% if r.status == "pending" %}
+                    <span class="badge badge-danger">PENDING</span>
+                    {% elif r.status == "reviewing" %}
+                    <span class="badge badge-warning">IN REVIEW</span>
+                    {% elif r.status == "resolved" %}
+                    <span class="badge badge-success">RESOLVED</span>
+                    {% else %}
+                    <span class="badge badge-secondary">DISMISSED</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <a href="{% url 'admin:moderation_report_change' r.id %}" class="ht-table-btn">Review</a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="ht-empty-state" style="padding: 24px;">
+            <div style="color:#10b981; font-size:24px; margin-bottom:6px;">✓</div>
+            <div style="font-weight:600; color:#172033;">No Pending Reports</div>
+            <p class="text-muted" style="font-size:13px; margin:4px 0 0;">All student reports have been resolved or no incidents filed.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+
+      <!-- Administrative Audit Trail -->
+      <div class="ht-card">
+        <div class="ht-card-header">
+          <div>
+            <h2 class="ht-card-title">Administrative Audit Trail</h2>
+            <p class="ht-card-subtitle">Real-time log of administrative and disciplinary actions</p>
+          </div>
+          <a href="{% url 'admin:moderation_adminactionlog_changelist' %}" class="ht-card-action">Full Audit Log →</a>
+        </div>
+        <div class="ht-card-body p-0">
+          {% render_recent_log 8 as admin_log %}
+          {% if admin_log %}
+          <div class="ht-log-stream">
+            {% for log in admin_log %}
+            <div class="ht-log-item">
+              <div class="ht-log-icon">
+                {% if "CREATE" in log.action or "ADD" in log.action %}
+                <span class="ht-icon-pill bg-success">＋</span>
+                {% elif "DELETE" in log.action or "BLOCK" in log.action or "PURGE" in log.action %}
+                <span class="ht-icon-pill bg-danger">✕</span>
+                {% elif "SUSPEND" in log.action or "HIDE" in log.action %}
+                <span class="ht-icon-pill bg-warning">⚠</span>
+                {% else %}
+                <span class="ht-icon-pill bg-primary">✎</span>
+                {% endif %}
+              </div>
+              <div class="ht-log-body">
+                <div class="ht-log-head">
+                  <span class="ht-log-action">{{ log.action }}</span>
+                  <span class="ht-log-time">{{ log.timestamp|timesince }} ago</span>
+                </div>
+                <div class="ht-log-notes">{{ log.notes|default:log.action }}</div>
+                <div class="ht-log-meta">
+                  <span>By: <strong>{{ log.admin.email|default:"Admin" }}</strong></span>
+                  {% if log.target_type %}
+                  <span>• Target: {{ log.target_type }} #{{ log.target_id }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="ht-empty-state" style="padding: 24px;">
+            <p class="text-muted" style="font-size:13px; margin:0;">No audit events recorded yet.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

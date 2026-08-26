@@ -1,0 +1,54 @@
+<fieldset class="module aligned ht-fieldset-card {{ fieldset.classes }}">
+  {% if fieldset.name %}
+    <div class="ht-fieldset-header">
+      <h2 class="ht-fieldset-title">{{ fieldset.name }}</h2>
+      {% if fieldset.description %}
+        <div class="ht-fieldset-desc">{{ fieldset.description|safe }}</div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="ht-fieldset-body">
+    {% for line in fieldset %}
+      <div class="form-row ht-form-row{% if line.fields|length == 1 and line.errors %} errors{% endif %}{% if not line.has_visible_field %} hidden{% endif %}{% for field in line %}{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% endfor %}">
+        {% if line.fields|length == 1 %}
+          {{ line.errors }}
+        {% endif %}
+        {% for field in line %}
+          <div class="ht-form-field-unit{% if line.fields|length != 1 %} fieldBox{% if field.field.name %} field-{{ field.field.name }}{% endif %}{% if not field.is_readonly and field.errors %} errors{% endif %}{% if field.field.is_hidden %} hidden{% endif %}{% elif field.is_checkbox %} checkbox-row{% endif %}">
+            {% if line.fields|length != 1 and not field.is_readonly %}{{ field.errors }}{% endif %}
+            
+            <div class="ht-label-wrap">
+              {% if field.is_checkbox %}
+                {{ field.field }}
+                <label for="{{ field.field.id_for_label }}" class="ht-checkbox-label">
+                  {{ field.field.label }}
+                  {% if field.field.field.required %}<span class="ht-required-dot" title="Required Field">*</span>{% endif %}
+                </label>
+              {% else %}
+                <label for="{{ field.field.id_for_label }}" class="ht-field-label">
+                  {{ field.field.label }}:
+                  {% if field.field.field.required %}<span class="ht-required-dot" title="Required Field">*</span>{% endif %}
+                </label>
+              {% endif %}
+            </div>
+
+            <div class="ht-field-control-wrap">
+              {% if not field.is_checkbox %}
+                {% if field.is_readonly %}
+                  <div class="readonly ht-readonly-val">{{ field.contents }}</div>
+                {% else %}
+                  {{ field.field }}
+                {% endif %}
+              {% endif %}
+
+              {% if field.field.help_text %}
+                <div class="help ht-help-text">{{ field.field.help_text|safe }}</div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</fieldset>

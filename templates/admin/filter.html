@@ -1,0 +1,30 @@
+{% load i18n %}
+<div class="ht-filter-group" data-title="{{ title }}">
+  <button type="button" class="ht-filter-trigger" aria-expanded="false">
+    <span class="ht-filter-title">{{ title }}</span>
+    <span class="ht-filter-selected">
+      {% for choice in choices %}
+        {% if choice.selected and not forloop.first %}
+          {{ choice.display }}
+        {% endif %}
+      {% endfor %}
+    </span>
+    <svg class="ht-filter-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </button>
+  <div class="ht-filter-dropdown-menu">
+    <div class="ht-filter-dropdown-header">{{ title }}</div>
+    <ul class="ht-filter-options-list">
+      {% for choice in choices %}
+        <li class="ht-filter-option-item {% if choice.selected %}active{% endif %}">
+          <a href="{{ choice.query_string|iriencode }}" class="ht-filter-option-link">
+            <span class="ht-filter-radio"></span>
+            <span class="ht-filter-text">{{ choice.display }}</span>
+            {% if choice.selected %}
+              <span class="ht-filter-check">✓</span>
+            {% endif %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>

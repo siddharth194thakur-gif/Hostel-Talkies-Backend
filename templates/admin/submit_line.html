@@ -1,0 +1,36 @@
+{% load i18n admin_urls %}
+<div class="submit-row ht-modern-submit-bar">
+  <div class="ht-submit-bar-inner">
+    <div class="ht-submit-left">
+      {% if show_delete_link and original %}
+        {% url opts|admin_urlname:'delete' original.pk|admin_urlquote as delete_url %}
+        <a href="{% add_preserved_filters delete_url %}" class="deletelink ht-btn-delete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          <span>{% translate "Delete" %}</span>
+        </a>
+      {% endif %}
+    </div>
+
+    <div class="ht-submit-right">
+      {% if show_save_as_new %}
+        <input type="submit" value="{% translate 'Save as new' %}" name="_saveasnew" class="ht-btn-sub">
+      {% endif %}
+      {% if show_save_and_add_another %}
+        <input type="submit" value="{% translate 'Save and add another' %}" name="_addanother" class="ht-btn-sub">
+      {% endif %}
+      {% if show_save_and_continue %}
+        <input type="submit" value="{% if can_change %}{% translate 'Save and continue editing' %}{% else %}{% translate 'Save and view' %}{% endif %}" name="_continue" class="ht-btn-sub">
+      {% endif %}
+      {% if show_save %}
+        <button type="submit" class="default ht-btn-primary" name="_save">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>{% translate 'Save Record' %}</span>
+        </button>
+      {% endif %}
+      {% if show_close %}
+        {% url opts|admin_urlname:'changelist' as changelist_url %}
+        <a href="{% add_preserved_filters changelist_url %}" class="closelink ht-btn-sub">{% translate 'Close' %}</a>
+      {% endif %}
+    </div>
+  </div>
+</div>

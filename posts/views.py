@@ -98,6 +98,10 @@ class PostViewSet(viewsets.ModelViewSet):
         if my_posts and self.request.user.is_authenticated:
             queryset = queryset.filter(author=self.request.user)
 
+        author_param = self.request.query_params.get('author')
+        if author_param:
+            queryset = queryset.filter(author_id=author_param)
+
         saved = self.request.query_params.get('saved')
         if saved and self.request.user.is_authenticated:
             saved_post_ids = SavedPost.objects.filter(user=self.request.user).values_list('post_id', flat=True)

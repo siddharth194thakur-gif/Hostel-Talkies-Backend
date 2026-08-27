@@ -239,10 +239,17 @@ else:
         'http://127.0.0.1:5173',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
+        'https://hostel-talkies.vercel.app',
+        'https://hostel-talkies-frontend.vercel.app',
     ]
     extra_cors = os.environ.get('CORS_ALLOWED_ORIGINS', '')
     if extra_cors:
         CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in extra_cors.split(',') if origin.strip()])
+
+# Allow all Vercel deployment preview subdomains automatically
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+]
 
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
@@ -257,5 +264,6 @@ CSRF_TRUSTED_ORIGINS = [
 extra_csrf = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 if extra_csrf:
     CSRF_TRUSTED_ORIGINS.extend([origin.strip() for origin in extra_csrf.split(',') if origin.strip()])
+
 
 

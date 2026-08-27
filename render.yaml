@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: hostel-talkies-backend
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://hostel-talkies.vercel.app,https://hostel-talkies-frontend.vercel.app"

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils.text import slugify
 from .models import Category, Post, PostImage, Like, Comment, SavedPost, BorrowRequest
 from users.serializers import UserPublicSerializer
 from hostels.serializers import HostelSerializer, BlockSerializer
@@ -128,19 +129,39 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+    custom_category = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        max_length=100
+    )
 
     class Meta:
         model = Post
         fields = [
-            'id', 'post_type', 'category', 'title', 'description',
+            'id', 'post_type', 'category', 'custom_category', 'title', 'description',
             'price', 'condition', 'status', 'location', 'event_date',
             'uploaded_images'
         ]
 
     def create(self, validated_data):
         images_data = validated_data.pop('uploaded_images', [])
+        custom_category_name = validated_data.pop('custom_category', '').strip()
         user = self.context['request'].user
         
+        # If custom category name provided, resolve or create Category
+        if custom_category_name:
+            category, _ = Category.objects.get_or_create(
+                name__iexact=custom_category_name,
+                defaults={
+                    'name': custom_category_name,
+                    'slug': slugify(custom_category_name),
+                    'icon': 'tag',
+                    'post_type': 'all',
+                }
+            )
+            validated_data['category'] = category
+
         # Set hostel and block from user profile if not explicitly set
         profile = getattr(user, 'profile', None)
         hostel = profile.hostel if profile else None
@@ -160,6 +181,20 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         images_data = validated_data.pop('uploaded_images', [])
+        custom_category_name = validated_data.pop('custom_category', '').strip()
+
+        if custom_category_name:
+            category, _ = Category.objects.get_or_create(
+                name__iexact=custom_category_name,
+                defaults={
+                    'name': custom_category_name,
+                    'slug': slugify(custom_category_name),
+                    'icon': 'tag',
+                    'post_type': 'all',
+                }
+            )
+            validated_data['category'] = category
+
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
         instance.save()

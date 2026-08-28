@@ -49,6 +49,7 @@ class Post(models.Model):
         ('help', 'Help / Query'),
         ('service', 'Service Announcement'),
         ('general', 'General Talkies'),
+        ('others', 'Others'),
     ]
 
     CONDITION_CHOICES = [

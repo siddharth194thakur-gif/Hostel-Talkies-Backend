@@ -10,3 +10,7 @@ python manage.py collectstatic --noinput
 
 # Apply database migrations
 python manage.py migrate --noinput
+
+# Auto-seed initial admin superuser and default hostels if database is fresh
+python manage.py setup_initial_data
+

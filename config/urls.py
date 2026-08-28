@@ -124,6 +124,12 @@ class AdminStatsView(views.APIView):
 from django.views.static import serve
 from django.urls import re_path
 
+# Django Admin branding & View Site target
+admin.site.site_header = "HostelTalkies Administration"
+admin.site.site_title = "HostelTalkies Admin"
+admin.site.index_title = "Welcome to HostelTalkies Admin Portal"
+admin.site.site_url = "https://hostel-talkies-frontend.vercel.app"
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('users.urls')),

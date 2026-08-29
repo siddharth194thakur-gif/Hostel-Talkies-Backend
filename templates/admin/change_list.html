@@ -40,28 +40,44 @@
   <!-- Dynamic Model KPI Summary Bar -->
   {% get_changelist_kpis cl.opts.app_label cl.opts.model_name as model_kpis %}
   
-  <div class="ht-cl-header">
-    <div class="ht-cl-title-wrap">
-      <div class="ht-cl-badge-app">{{ cl.opts.app_config.verbose_name }}</div>
-      <h1 class="ht-cl-title">{{ cl.opts.verbose_name_plural|capfirst }}</h1>
-      <p class="ht-cl-subtitle">Manage and oversee {{ cl.opts.verbose_name_plural|lower }} across the campus network</p>
+  <!-- 1. 4K Ultra-Luxury 3D Header Banner -->
+  <div class="ht-hero-banner banner-3d" style="margin-bottom: 24px; padding: 30px 36px;">
+    <div class="ht-hero-content">
+      <div class="ht-hero-badge">
+        <span class="ht-pulse-dot"></span>
+        <span>⚡ 4K CAMPUS REGISTRY • {{ cl.opts.app_config.verbose_name|upper }}</span>
+      </div>
+      <h1 class="ht-hero-title">{{ cl.opts.verbose_name_plural|capfirst }} Management Hub 🛡️</h1>
+      <p class="ht-hero-desc">
+        Live database records, institutional oversight, and moderation controls for {{ cl.opts.verbose_name_plural|lower }} across all campus hostels.
+      </p>
+
+      {% block object-tools %}
+        <div class="ht-hero-actions" style="margin-top: 14px;">
+          {% block object-tools-items %}
+            {% change_list_object_tools %}
+          {% endblock %}
+        </div>
+      {% endblock %}
     </div>
-    {% block object-tools %}
-      <ul class="object-tools">
-        {% block object-tools-items %}
-          {% change_list_object_tools %}
-        {% endblock %}
-      </ul>
-    {% endblock %}
+    <div class="ht-hero-watermark">{{ cl.opts.verbose_name|slice:":2"|upper }}</div>
   </div>
 
+  <!-- 2. 4K Spatial HUD Metric KPI Tiles -->
   {% if model_kpis %}
-  <div class="ht-model-kpis-grid">
+  <div class="ht-model-kpis-grid" style="margin-bottom: 24px;">
     {% for kpi in model_kpis %}
-    <div class="ht-model-kpi-card" style="border-left: 4px solid {{ kpi.color }};">
-      <div class="ht-model-kpi-lbl">{{ kpi.label }}</div>
-      <div class="ht-model-kpi-val" style="color: {{ kpi.color }};">{{ kpi.value }}</div>
-      <div class="ht-model-kpi-sub">{{ kpi.sub }}</div>
+    <div class="ht-kpi-card card-3d-luxury" style="border-top: 3px solid {{ kpi.color }}; padding: 18px 22px;">
+      <div class="ht-kpi-header" style="margin-bottom: 8px;">
+        <span class="ht-kpi-label">{{ kpi.label }}</span>
+        <div class="ht-kpi-icon" style="background: rgba(99, 102, 241, 0.08); color: {{ kpi.color }}; width: 34px; height: 34px; border-radius: 10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+      </div>
+      <div class="ht-kpi-value" style="color: {{ kpi.color }}; font-size: 26px; margin-bottom: 4px;">{{ kpi.value }}</div>
+      <div class="ht-kpi-meta">
+        <span>{{ kpi.sub }}</span>
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -75,8 +91,8 @@
     </div>
   {% endif %}
 
-  <!-- Unified Modern Controls Bar (Search + Horizontal Filters) -->
-  <div class="ht-controls-bar">
+  <!-- 3. Unified Modern Controls Bar (Search + Horizontal Filters) -->
+  <div class="ht-controls-bar card-3d-luxury">
     <div class="ht-controls-left">
       {% block search %}{% search_form cl %}{% endblock %}
     </div>
@@ -95,7 +111,8 @@
     {% endif %}
   </div>
 
-  <div class="module{% if cl.has_filters %} filtered{% endif %}" id="changelist">
+  <!-- 4. 4K 3D Elevated Table Container -->
+  <div class="module{% if cl.has_filters %} filtered{% endif %} card-3d-luxury" id="changelist">
     <div class="changelist-form-container">
       {% block date_hierarchy %}{% if cl.date_hierarchy %}{% date_hierarchy cl %}{% endif %}{% endblock %}
 
@@ -106,30 +123,23 @@
 
       {% block result_list %}
         {% if action_form and actions_on_top and cl.show_admin_actions %}{% admin_actions %}{% endif %}
-        
-        <div class="ht-table-card">
-          {% result_list cl %}
-        </div>
-
+        {% result_list cl %}
         {% if action_form and actions_on_bottom and cl.show_admin_actions %}{% admin_actions %}{% endif %}
       {% endblock %}
-
       {% block pagination %}{% pagination cl %}{% endblock %}
       </form>
     </div>
-  </div>
-</div>
-
-<!-- Floating Action Confirmation Modal -->
-<div class="ht-modal-backdrop" id="ht-confirm-modal" style="display:none;">
-  <div class="ht-modal-card">
-    <div class="ht-modal-icon" id="ht-modal-icon">⚠️</div>
-    <h3 class="ht-modal-title" id="ht-modal-title">Confirm Bulk Action</h3>
-    <p class="ht-modal-desc" id="ht-modal-desc">Are you sure you want to apply this action to the selected items?</p>
-    <div class="ht-modal-actions">
-      <button type="button" class="ht-modal-btn ht-modal-btn-cancel" id="ht-modal-cancel">Cancel</button>
-      <button type="button" class="ht-modal-btn ht-modal-btn-confirm" id="ht-modal-confirm">Confirm & Proceed</button>
-    </div>
+    {% block filters %}
+      {% if cl.has_filters %}
+        <nav id="changelist-filter" aria-labelledby="changelist-filter-header">
+          <h2 id="changelist-filter-header">{% translate 'Filter' %}</h2>
+          {% if cl.has_active_filters %}<h3 id="changelist-filter-clear">
+            <a href="{{ cl.clear_all_filters_qs }}">&#10006; {% translate "Clear all filters" %}</a>
+          </h3>{% endif %}
+          {% for spec in cl.filter_specs %}{% admin_list_filter cl spec %}{% endfor %}
+        </nav>
+      {% endif %}
+    {% endblock %}
   </div>
 </div>
 {% endblock %}

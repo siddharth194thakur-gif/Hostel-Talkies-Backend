@@ -27,35 +27,39 @@
 
 {% block content %}
 <div id="content-main" class="ht-changeform-container">
-  <!-- Top Header with Object Title & Actions -->
-  <div class="ht-cf-header">
-    <div class="ht-cf-title-wrap">
-      <div class="ht-cf-badge-app">{{ opts.app_config.verbose_name }}</div>
-      <h1 class="ht-cf-title">
+  <!-- 1. 4K Ultra-Luxury 3D Master ChangeForm Banner -->
+  <div class="ht-hero-banner banner-3d" style="margin-bottom: 24px; padding: 28px 36px;">
+    <div class="ht-hero-content">
+      <div class="ht-hero-badge">
+        <span class="ht-pulse-dot"></span>
+        <span>⚡ 4K INSTANCE EDITOR • {{ opts.app_config.verbose_name|upper }}</span>
+      </div>
+      <h1 class="ht-hero-title">
         {% if add %}
-          + Create New {{ opts.verbose_name|capfirst }}
+          + Create New {{ opts.verbose_name|capfirst }} 🛡️
         {% else %}
-          Edit {{ opts.verbose_name|capfirst }}: <span class="ht-cf-orig-title">{{ original }}</span>
+          Edit {{ opts.verbose_name|capfirst }}: <span style="color:#f59e0b;">{{ original }}</span>
         {% endif %}
       </h1>
-      <p class="ht-cf-subtitle">
+      <p class="ht-hero-desc">
         {% if add %}
-          Fill in the details below to publish a new record to the platform.
+          Fill in institutional parameters below to provision a new record onto the campus network.
         {% else %}
-          Update attributes, attachments, and configurations for this record.
+          Update attributes, allocations, verification badges, and settings for this record.
         {% endif %}
       </p>
-    </div>
 
-    {% block object-tools %}
-    {% if change and not is_popup %}
-      <ul class="object-tools">
-        {% block object-tools-items %}
-          {% change_form_object_tools %}
-        {% endblock %}
-      </ul>
-    {% endif %}
-    {% endblock %}
+      {% block object-tools %}
+      {% if change and not is_popup %}
+        <div class="ht-hero-actions" style="margin-top: 14px;">
+          {% block object-tools-items %}
+            {% change_form_object_tools %}
+          {% endblock %}
+        </div>
+      {% endif %}
+      {% endblock %}
+    </div>
+    <div class="ht-hero-watermark">{{ opts.verbose_name|slice:":2"|upper }}</div>
   </div>
 
   <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}{% if form_url %}action="{{ form_url }}" {% endif %}method="post" id="{{ opts.model_name }}_form" novalidate class="ht-changeform-form">
@@ -74,7 +78,7 @@
       </div>
     {% endif %}
 
-    <!-- Fieldsets rendered in modern clean cards -->
+    <!-- Fieldsets rendered in 4K 3D Luxury Elevated Cards -->
     <div class="ht-fieldsets-wrap">
       {% block field_sets %}
         {% for fieldset in adminform %}

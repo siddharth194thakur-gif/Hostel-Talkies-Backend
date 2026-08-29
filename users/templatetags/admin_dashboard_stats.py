@@ -107,6 +107,20 @@ def get_dashboard_stats():
     dismissed_reports = reports_qs.filter(status='dismissed').count()
     pending_feedback = Feedback.objects.filter(status='pending').count()
 
+    # Gaming & Esports
+    total_gamers = 0
+    verified_gamers = 0
+    total_tournaments = 0
+    active_tournaments = 0
+    try:
+        from gaming.models import GamingProfile, Tournament
+        total_gamers = GamingProfile.objects.count()
+        verified_gamers = GamingProfile.objects.filter(is_verified=True).count()
+        total_tournaments = Tournament.objects.count()
+        active_tournaments = Tournament.objects.filter(status__in=['upcoming', 'live']).count()
+    except Exception:
+        pass
+
     # Dynamic Hostel Overview List (Optimized batch queries)
     room_stats = {
         item['block__hostel_id']: item
@@ -192,6 +206,11 @@ def get_dashboard_stats():
         'resolved_reports': resolved_reports,
         'dismissed_reports': dismissed_reports,
         'pending_feedback': pending_feedback,
+
+        'total_gamers': total_gamers,
+        'verified_gamers': verified_gamers,
+        'total_tournaments': total_tournaments,
+        'active_tournaments': active_tournaments,
 
         # Complex Entities
         'hostels_summary': hostels_summary,

@@ -1,12 +1,14 @@
 import os
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.utils.text import slugify
 from hostels.models import Hostel, Block, Room
+from posts.models import Category
 
 User = get_user_model()
 
 class Command(BaseCommand):
-    help = 'Automatically seeds default superuser admin and campus hostels on Render deploy'
+    help = 'Automatically seeds default superuser admin, campus hostels, and categories on Render deploy'
 
     def handle(self, *args, **options):
         admin_email = os.environ.get('ADMIN_EMAIL', 'admin@hosteltalkies.com').strip().lower()
@@ -48,3 +50,33 @@ class Command(BaseCommand):
                     block, _ = Block.objects.get_or_create(hostel=hostel, name=b_name)
                     for r_num in ['101', '102', '103', '201', '202']:
                         Room.objects.get_or_create(block=block, room_number=r_num)
+
+        # Create comprehensive standard categories for campus hostel life
+        default_categories = [
+            {'name': 'Electronics & Gadgets', 'icon': 'laptop', 'post_type': 'all'},
+            {'name': 'Books, Notes & PYQs', 'icon': 'book', 'post_type': 'all'},
+            {'name': 'Cycles & Mobility', 'icon': 'bicycle', 'post_type': 'all'},
+            {'name': 'Room Essentials & Decor', 'icon': 'home', 'post_type': 'all'},
+            {'name': 'Study Desks & Furniture', 'icon': 'armchair', 'post_type': 'all'},
+            {'name': 'Lab Gear & Uniforms', 'icon': 'shirt', 'post_type': 'all'},
+            {'name': 'Sports & Fitness Equipment', 'icon': 'dumbbell', 'post_type': 'all'},
+            {'name': 'Gaming & Entertainment', 'icon': 'gamepad', 'post_type': 'all'},
+            {'name': 'Mess & Kitchen Appliances', 'icon': 'utensils', 'post_type': 'all'},
+            {'name': 'Lost & Found Items', 'icon': 'search', 'post_type': 'all'},
+            {'name': 'Roommate & Accommodation', 'icon': 'users', 'post_type': 'all'},
+            {'name': 'General Campus Talkies', 'icon': 'sparkles', 'post_type': 'all'},
+        ]
+
+        for cat_data in default_categories:
+            slug = slugify(cat_data['name'])
+            category, cat_created = Category.objects.get_or_create(
+                name=cat_data['name'],
+                defaults={
+                    'slug': slug,
+                    'icon': cat_data['icon'],
+                    'post_type': cat_data['post_type'],
+                    'is_active': True
+                }
+            )
+            if cat_created:
+                self.stdout.write(self.style.SUCCESS(f"Category '{category.name}' created."))

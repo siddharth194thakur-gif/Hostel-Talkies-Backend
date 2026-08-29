@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'messaging',
     'notifications',
     'moderation',
+    'gaming',
 ]
 
 MIDDLEWARE = [

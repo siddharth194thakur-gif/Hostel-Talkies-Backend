@@ -142,6 +142,7 @@ urlpatterns = [
     path('api/messages/', include('messaging.urls')),
     path('api/notifications/', include('notifications.urls')),
     path('api/moderation/', include('moderation.urls')),
+    path('api/gaming/', include('gaming.urls')),
     path('api/search/', GlobalSearchView.as_view(), name='global-search'),
     path('api/admin-stats/', AdminStatsView.as_view(), name='admin-stats'),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),

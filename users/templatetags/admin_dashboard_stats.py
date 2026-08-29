@@ -343,12 +343,29 @@ def get_changelist_kpis(app_label, model_name):
             {'label': 'Pending Feedback', 'value': fb_qs.filter(status='pending').count(), 'color': '#f59e0b', 'sub': 'Unreviewed'},
             {'label': 'Resolved', 'value': fb_qs.filter(status='resolved').count(), 'color': '#10b981', 'sub': 'Addressed'},
         ]
-    elif app_label == 'moderation' and model_name == 'adminactionlog':
-        lg_qs = AdminActionLog.objects.all()
-        kpis = [
-            {'label': 'Total Audit Logs', 'value': lg_qs.count(), 'color': '#4f46e5', 'sub': 'Logged Admin Actions'},
-            {'label': 'Create Operations', 'value': lg_qs.filter(action__icontains='CREATE').count(), 'color': '#10b981', 'sub': 'Provisioning'},
-            {'label': 'Moderation Actions', 'value': lg_qs.filter(Q(action__icontains='BLOCK') | Q(action__icontains='SUSPEND') | Q(action__icontains='HIDE') | Q(action__icontains='DELETE')).count(), 'color': '#ef4444', 'sub': 'Disciplinary'},
-        ]
+    elif app_label == 'gaming' and model_name == 'gamingprofile':
+        try:
+            from gaming.models import GamingProfile
+            g_qs = GamingProfile.objects.all()
+            kpis = [
+                {'label': 'Total Gamers', 'value': g_qs.count(), 'color': '#8b5cf6', 'sub': 'Registered Profiles'},
+                {'label': 'Grandmasters', 'value': g_qs.filter(br_rank__icontains='Grandmaster').count(), 'color': '#f59e0b', 'sub': 'Top Tier Rank 👑'},
+                {'label': 'Verified Players', 'value': g_qs.filter(is_verified=True).count(), 'color': '#10b981', 'sub': 'UID Verified'},
+                {'label': 'Avg K/D Ratio', 'value': round(g_qs.aggregate(kd=Sum('kd_ratio'))['kd'] / (g_qs.count() or 1), 2), 'color': '#0284c7', 'sub': 'Skill Metric'},
+            ]
+        except Exception:
+            pass
+    elif app_label == 'gaming' and model_name == 'tournament':
+        try:
+            from gaming.models import Tournament
+            t_qs = Tournament.objects.all()
+            kpis = [
+                {'label': 'Total Matches', 'value': t_qs.count(), 'color': '#8b5cf6', 'sub': 'Custom Rooms'},
+                {'label': 'Upcoming Matches', 'value': t_qs.filter(status='upcoming').count(), 'color': '#f59e0b', 'sub': 'Scheduled'},
+                {'label': 'Live Rooms', 'value': t_qs.filter(status='live').count(), 'color': '#ef4444', 'sub': 'Playing Now 🔥'},
+                {'label': 'Completed', 'value': t_qs.filter(status='completed').count(), 'color': '#10b981', 'sub': 'Finished'},
+            ]
+        except Exception:
+            pass
 
     return kpis

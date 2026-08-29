@@ -168,3 +168,59 @@ class BlockedUsersListView(views.APIView):
         return Response(serializer.data)
 
 
+class AdminDashboardStatsView(views.APIView):
+    """Provides high-level system metrics and health for the 4K Admin Command Hub."""
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        from posts.models import Post
+        from moderation.models import Report, Feedback, AdminActionLog
+        from hostels.models import Hostel
+
+        total_students = User.objects.count()
+        total_posts = Post.objects.count()
+        pending_reports = Report.objects.filter(status='pending').count()
+        total_reports = Report.objects.count()
+        pending_feedback = Feedback.objects.filter(status='pending').count()
+        total_hostels = Hostel.objects.count()
+
+        # Gamers count if gaming app is installed
+        total_gamers = 0
+        try:
+            from gaming.models import GamingProfile
+            total_gamers = GamingProfile.objects.count()
+        except Exception:
+            pass
+
+        # Recent 8 registered students
+        recent_students = User.objects.select_related('profile', 'profile__hostel').order_by('-date_joined')[:8]
+        students_data = UserSerializer(recent_students, many=True, context={'request': request}).data
+
+        # Recent 6 action logs
+        recent_logs = AdminActionLog.objects.select_related('admin').order_by('-timestamp')[:6]
+        from moderation.serializers import AdminActionLogSerializer
+        logs_data = AdminActionLogSerializer(recent_logs, many=True).data
+
+        return Response({
+            'stats': {
+                'total_students': total_students,
+                'total_posts': total_posts,
+                'pending_reports': pending_reports,
+                'total_reports': total_reports,
+                'pending_feedback': pending_feedback,
+                'total_hostels': total_hostels,
+                'total_gamers': total_gamers,
+            },
+            'recent_students': students_data,
+            'recent_logs': logs_data,
+        })
+
+
+class AdminUsersListView(generics.ListAPIView):
+    """List all students for administrative control and moderation."""
+    queryset = User.objects.select_related('profile', 'profile__hostel').order_by('-date_joined')
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+
+

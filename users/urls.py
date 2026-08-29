@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView, LoginView, CurrentUserView, ProfileUpdateView,
     UserDetailView, PasswordResetMockView, BlockUserView, UnblockUserView,
-    BlockedUsersListView
+    BlockedUsersListView, AdminDashboardStatsView, AdminUsersListView
 )
 
 urlpatterns = [
@@ -18,6 +18,10 @@ urlpatterns = [
     path('users/<int:pk>/unblock/', UnblockUserView.as_view(), name='unblock_user'),
     path('blocked-users/', BlockedUsersListView.as_view(), name='blocked_users_list'),
     path('password-reset/', PasswordResetMockView.as_view(), name='password_reset'),
+
+    # Admin Command Center Routes
+    path('admin/stats/', AdminDashboardStatsView.as_view(), name='admin_stats'),
+    path('admin/users/', AdminUsersListView.as_view(), name='admin_users_list'),
 ]
 
 

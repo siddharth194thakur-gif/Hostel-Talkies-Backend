@@ -87,17 +87,9 @@ def fetch_freefire_profile(uid: str, region: str = 'ind') -> dict:
             logger.debug(f"Gateway {url} error: {e}")
             continue
 
-    # Graceful fallback estimation if external gateway nodes are down
+    # If external gateway nodes are down or blocked by Garena
     return {
-        'success': True,
+        'success': False,
         'uid': clean_uid,
-        'in_game_name': f"FF_Pro_{clean_uid[-4:]}",
-        'level': 55,
-        'likes': 1420,
-        'br_rank': 'Heroic 💎',
-        'br_rank_points': 2650,
-        'cs_rank': 'Heroic',
-        'region': region.upper(),
-        'avatar_url': None,
-        'is_fallback': True
+        'error': 'Live Garena gateway is unreachable or protected. Please enter your authentic Free Fire in-game name and stats to claim your rank.'
     }

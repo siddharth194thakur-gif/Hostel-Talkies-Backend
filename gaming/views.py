@@ -55,27 +55,41 @@ class MyGamingProfileView(views.APIView):
             defaults={'uid': uid, 'in_game_name': request.data.get('in_game_name', f"Player_{uid[-4:]}")}
         )
 
-        # Update profile fields from request
-        profile.uid = uid
-        if 'in_game_name' in request.data:
-            profile.in_game_name = request.data.get('in_game_name') or profile.in_game_name
-        if 'level' in request.data:
-            profile.level = int(request.data.get('level') or profile.level)
-        if 'likes' in request.data:
-            profile.likes = int(request.data.get('likes') or profile.likes)
-        if 'br_rank' in request.data:
-            profile.br_rank = request.data.get('br_rank') or profile.br_rank
-        if 'br_rank_points' in request.data:
-            profile.br_rank_points = int(request.data.get('br_rank_points') or profile.br_rank_points)
-        if 'kd_ratio' in request.data:
-            profile.kd_ratio = float(request.data.get('kd_ratio') or profile.kd_ratio)
-        if 'total_booyahs' in request.data:
-            profile.total_booyahs = int(request.data.get('total_booyahs') or profile.total_booyahs)
-        if 'avatar_url' in request.data:
-            profile.avatar_url = request.data.get('avatar_url')
-        if 'region' in request.data:
-            profile.region = request.data.get('region') or 'IND'
+        # If name or stats are not explicitly provided, auto-fetch from Free Fire gateway
+        region = request.data.get('region', 'IND') or 'IND'
+        if not request.data.get('in_game_name'):
+            live_data = fetch_freefire_profile(uid, region=region)
+            if live_data.get('success'):
+                profile.in_game_name = live_data.get('in_game_name') or profile.in_game_name
+                profile.level = live_data.get('level') or profile.level
+                profile.likes = live_data.get('likes') or profile.likes
+                profile.br_rank = live_data.get('br_rank') or profile.br_rank
+                profile.br_rank_points = live_data.get('br_rank_points') or profile.br_rank_points
+                profile.cs_rank = live_data.get('cs_rank') or profile.cs_rank
+                profile.kd_ratio = live_data.get('kd_ratio') or profile.kd_ratio
+                profile.total_booyahs = live_data.get('total_booyahs') or profile.total_booyahs
+                profile.avatar_url = live_data.get('avatar_url') or profile.avatar_url
+        else:
+            if 'in_game_name' in request.data:
+                profile.in_game_name = request.data.get('in_game_name') or profile.in_game_name
+            if 'level' in request.data:
+                profile.level = int(request.data.get('level') or profile.level)
+            if 'likes' in request.data:
+                profile.likes = int(request.data.get('likes') or profile.likes)
+            if 'br_rank' in request.data:
+                profile.br_rank = request.data.get('br_rank') or profile.br_rank
+            if 'br_rank_points' in request.data:
+                profile.br_rank_points = int(request.data.get('br_rank_points') or profile.br_rank_points)
+            if 'cs_rank' in request.data:
+                profile.cs_rank = request.data.get('cs_rank') or profile.cs_rank
+            if 'kd_ratio' in request.data:
+                profile.kd_ratio = float(request.data.get('kd_ratio') or profile.kd_ratio)
+            if 'total_booyahs' in request.data:
+                profile.total_booyahs = int(request.data.get('total_booyahs') or profile.total_booyahs)
+            if 'avatar_url' in request.data:
+                profile.avatar_url = request.data.get('avatar_url')
 
+        profile.region = region
         if 'proof_screenshot' in request.FILES:
             profile.proof_screenshot = request.FILES['proof_screenshot']
 

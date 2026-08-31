@@ -129,6 +129,18 @@ else:
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
+# Cache Configuration (5-minute TTL for player lookups)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'hosteltalkies-cache',
+    }
+}
+
+# Free Fire API Provider Configuration
+FREEFIRE_API_BASE_URL = os.environ.get('FREEFIRE_API_BASE_URL', '').strip()
+FREEFIRE_API_KEY = os.environ.get('FREEFIRE_API_KEY', '').strip()
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {

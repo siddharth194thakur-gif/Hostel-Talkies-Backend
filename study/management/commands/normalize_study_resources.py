@@ -170,6 +170,62 @@ class Command(BaseCommand):
                 dirty = True
                 type_migrated += 1
 
+            # ── 5b. Subject Canonicalisation & Semester Alignment ─────────────
+            subj_lower = r.course_name.strip().lower()
+            if subj_lower in ['data structure', 'data structures', 'basic dsa']:
+                if r.course_name != 'Data Structures & Algorithms':
+                    r.course_name = 'Data Structures & Algorithms'
+                    dirty = True
+            elif subj_lower == 'engineering mathematics - ii':
+                if r.semester != 'Sem 2':
+                    self.stdout.write(f'  [SEM-ALIGN] id={r.id} Math II "{r.semester}" → "Sem 2"')
+                    r.semester = 'Sem 2'
+                    dirty = True
+            elif subj_lower == 'engineering mathematics - i':
+                if any(x in r.title.lower() for x in ['maths-ii', 'math-ii', 'mathematics - ii', 'maths 2', 'maths ii']):
+                    self.stdout.write(f'  [SUBJ-ALIGN] id={r.id} "{r.course_name}" → "Engineering Mathematics - II"')
+                    r.course_name = 'Engineering Mathematics - II'
+                    r.semester = 'Sem 2'
+                    dirty = True
+                elif r.semester == 'Sem 1 & 2':
+                    self.stdout.write(f'  [SEM-ALIGN] id={r.id} Math I "{r.semester}" → "Sem 1"')
+                    r.semester = 'Sem 1'
+                    dirty = True
+
+            # ── 5c. Extract & normalise year and exam_session for PYQs ────────
+            if r.resource_type == 'pyq':
+                text = f"{r.title} {r.description} {r.external_link}"
+                y4 = re.findall(r'\b(20[12][0-9])\b', text)
+                extracted_year = ''
+                if y4:
+                    extracted_year = y4[-1]
+                else:
+                    y2 = re.search(r'\bpyq\s*(?:s[12]\s*)?([12][0-9])\b', text, re.I) or re.search(r'\b(?:20)?([12][0-9])\s*pyq\b', text, re.I)
+                    if y2:
+                        val = int(y2.group(1))
+                        if 15 <= val <= 26:
+                            extracted_year = f'20{val}'
+
+                extracted_session = ''
+                if re.search(r'\b(?:s1\b|session\s*1\b|odd\s*sem(?:ester)?\b)', text, re.I):
+                    extracted_session = 'Odd Semester (S1)'
+                elif re.search(r'\b(?:s2\b|session\s*2\b|even\s*sem(?:ester)?\b)', text, re.I):
+                    extracted_session = 'Even Semester (S2)'
+                elif re.search(r'\bback\s*paper\b', text, re.I):
+                    extracted_session = 'Back Paper'
+                elif re.search(r'\bregular\b', text, re.I):
+                    extracted_session = 'Regular'
+
+                if extracted_year and r.year != extracted_year:
+                    self.stdout.write(f'  [YEAR-SET] id={r.id} year: "{r.year}" → "{extracted_year}"')
+                    r.year = extracted_year
+                    dirty = True
+
+                if extracted_session and r.exam_session != extracted_session:
+                    self.stdout.write(f'  [SESS-SET] id={r.id} session: "{r.exam_session}" → "{extracted_session}"')
+                    r.exam_session = extracted_session
+                    dirty = True
+
             # ── 6. Mark needs_review for genuinely ambiguous records ──────────
             # Criteria: course_name is a vague fallback value
             vague_courses = {

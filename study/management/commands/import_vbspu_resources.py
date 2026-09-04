@@ -114,6 +114,8 @@ class Command(BaseCommand):
                             semester=norm['semester'],
                             department=norm['department'],
                             unit=norm.get('unit', ''),
+                            year=norm.get('year', ''),
+                            exam_session=norm.get('exam_session', ''),
                             external_link=link,
                             source_website='VBSPU PYQ Hub',
                             source_url='https://www.vbspu-pyq-hub.online/',
@@ -229,6 +231,8 @@ class Command(BaseCommand):
                                 semester=norm['semester'],
                                 department=norm['department'],
                                 unit=norm.get('unit', ''),
+                                year=norm.get('year', ''),
+                                exam_session=norm.get('exam_session', ''),
                                 external_link=href,
                                 source_website='VbspuEDU',
                                 source_url=post_url,
@@ -479,6 +483,24 @@ class Command(BaseCommand):
         if unit:
             description += f" Coverage: {unit}."
 
+        # 5b. YEAR & SESSION DETECTION
+        y4 = re.findall(r'\b(20[12][0-9])\b', f"{combined_text} {year}")
+        clean_year = y4[-1] if y4 else (year if (year.isdigit() and len(year) == 4) else '')
+        if not clean_year:
+            y2 = re.search(r'\bpyq\s*(?:s[12]\s*)?([12][0-9])\b', combined_text, re.I)
+            if y2 and 15 <= int(y2.group(1)) <= 26:
+                clean_year = f"20{y2.group(1)}"
+
+        clean_session = ''
+        if re.search(r'\b(?:s1\b|session\s*1\b|odd\s*sem(?:ester)?\b)', combined_text, re.I):
+            clean_session = 'Odd Semester (S1)'
+        elif re.search(r'\b(?:s2\b|session\s*2\b|even\s*sem(?:ester)?\b)', combined_text, re.I):
+            clean_session = 'Even Semester (S2)'
+        elif re.search(r'\bback\s*paper\b', combined_text, re.I):
+            clean_session = 'Back Paper'
+        elif re.search(r'\bregular\b', combined_text, re.I):
+            clean_session = 'Regular'
+
         return {
             'title': final_title[:200],
             'description': description,
@@ -487,6 +509,8 @@ class Command(BaseCommand):
             'semester': semester,
             'department': department,
             'unit': unit,
+            'year': clean_year,
+            'exam_session': clean_session,
             'resource_type': resource_type,
             'resource_type_display': resource_type_display,
             'author': author

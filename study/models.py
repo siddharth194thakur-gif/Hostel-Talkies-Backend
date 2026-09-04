@@ -29,6 +29,8 @@ class StudyResource(models.Model):
     semester     = models.CharField(max_length=20, blank=True, default='', help_text='e.g. Sem 1, Sem 3')
     department   = models.CharField(max_length=100, blank=True, default='', help_text='e.g. Computer Science (CSE)')
     unit         = models.CharField(max_length=50, blank=True, default='', help_text='e.g. Unit 1, Unit 2, All Units')
+    year         = models.CharField(max_length=20, blank=True, default='', help_text='Academic / Exam Year, e.g. 2025, 2024')
+    exam_session = models.CharField(max_length=50, blank=True, default='', help_text='Exam session, e.g. Regular, Back Paper, S1, S2, Odd Sem, Even Sem')
 
     # Content
     file          = models.FileField(upload_to='study_resources/', null=True, blank=True)

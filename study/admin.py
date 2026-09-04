@@ -7,11 +7,11 @@ from .models import StudyResource
 @admin.register(StudyResource)
 class StudyResourceAdmin(admin.ModelAdmin):
     list_display = (
-        'title_display', 'resource_type_badge', 'course_info', 'department_badge',
+        'title_display', 'resource_type_badge', 'course_info', 'year_display', 'department_badge',
         'semester_badge', 'unit_badge', 'source_badge', 'file_preview_badge', 'uploader_display', 'downloads_count', 'status_badge', 'created_at'
     )
-    list_filter = ('resource_type', 'department', 'semester', 'unit', 'source_website', 'is_pending_review', 'is_active', 'created_at')
-    search_fields = ('title', 'description', 'course_name', 'course_code', 'unit', 'author', 'source_website', 'uploader__email', 'uploader__first_name', 'uploader__last_name')
+    list_filter = ('resource_type', 'year', 'exam_session', 'department', 'semester', 'unit', 'source_website', 'is_pending_review', 'is_active', 'created_at')
+    search_fields = ('title', 'description', 'course_name', 'course_code', 'unit', 'year', 'exam_session', 'author', 'source_website', 'uploader__email', 'uploader__first_name', 'uploader__last_name')
     list_per_page = 25
     actions = ['activate_resources', 'deactivate_resources', 'approve_and_activate', 'mark_pending_review']
     
@@ -21,8 +21,9 @@ class StudyResourceAdmin(admin.ModelAdmin):
                 ('title', 'resource_type'),
                 ('department', 'course_name'),
                 ('course_code', 'semester', 'unit'),
+                ('year', 'exam_session'),
             ),
-            'description': 'Specify course subject details, department classification, academic semester, and unit.'
+            'description': 'Specify course subject details, department classification, academic semester, year, and unit.'
         }),
         ('📄 PDF / Document Attachment & Attribution', {
             'fields': (
@@ -78,6 +79,17 @@ class StudyResourceAdmin(admin.ModelAdmin):
             obj.course_name or "—"
         )
     course_info.short_description = "Course / Subject"
+
+    def year_display(self, obj):
+        if not obj.year:
+            return format_html('<span style="color:#94a3b8; font-size:11px;">—</span>')
+        session_html = f'<div style="font-size:10px; color:#64748b;">{obj.exam_session}</div>' if obj.exam_session else ''
+        return format_html(
+            '<span class="badge" style="background:#fef9c3; color:#854d0e; font-weight:700; font-size:11px;">{}</span>{}',
+            obj.year,
+            format_html(session_html)
+        )
+    year_display.short_description = "Year / Exam"
 
     def department_badge(self, obj):
         if not obj.department:

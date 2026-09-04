@@ -1,3 +1,4 @@
+import re
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -46,6 +47,10 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
         if unit:
             qs = qs.filter(unit__icontains=unit)
 
+        year = p.get('year')
+        if year:
+            qs = qs.filter(year=year)
+
         course = p.get('course')
         if course:
             qs = qs.filter(
@@ -59,6 +64,8 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
                 Q(description__icontains=search) |
                 Q(course_name__icontains=search) |
                 Q(course_code__icontains=search) |
+                Q(year__icontains=search) |
+                Q(exam_session__icontains=search) |
                 Q(author__icontains=search) |
                 Q(unit__icontains=search)
             )
@@ -68,6 +75,8 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
         if needs_review in ('true', '1') and self.request.user and self.request.user.is_staff:
             qs = qs.filter(needs_review=True)
 
+        if resource_type == 'pyq':
+            return qs.order_by('-year', '-created_at')
         return qs.order_by('-created_at')
 
     def get_serializer_class(self):
@@ -128,44 +137,79 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
         units = sorted(set(
             qs.exclude(unit='').values_list('unit', flat=True).distinct()
         ))
+        years = sorted(
+            set(qs.exclude(year='').values_list('year', flat=True).distinct()),
+            key=lambda y: int(re.sub(r'\D', '', y)[:4]) if re.search(r'\d', y) else 0,
+            reverse=True
+        )
 
-        # ── Hierarchy tree ───────────────────────────────────────────────────
-        # Build: semester → department → course_name → {types, units}
+        # ── Hierarchy trees ──────────────────────────────────────────────────
+        # Build: semester → department → course_name → {types, units, years}
         # One DB round-trip via values().
-        rows = qs.values('semester', 'department', 'course_name', 'resource_type', 'unit')
+        rows = qs.values('semester', 'department', 'course_name', 'resource_type', 'unit', 'year', 'exam_session')
 
         hierarchy: dict = {}
+        pyqs_hierarchy: dict = {}
+
         for row in rows:
             sem   = row['semester']      or ''
             dept  = row['department']    or ''
             subj  = row['course_name']   or ''
             rtype = row['resource_type'] or ''
             unit  = row['unit']          or ''
+            yr    = row['year']          or ''
+            sess  = row['exam_session']  or ''
 
             if not sem or not dept or not subj:
                 continue
 
+            # General hierarchy
             sem_node  = hierarchy.setdefault(sem, {})
             dept_node = sem_node.setdefault(dept, {})
-            subj_node = dept_node.setdefault(subj, {'types': [], 'units': []})
+            subj_node = dept_node.setdefault(subj, {'types': [], 'units': [], 'years': []})
 
             if rtype and rtype not in subj_node['types']:
                 subj_node['types'].append(rtype)
             if unit and unit not in subj_node['units']:
                 subj_node['units'].append(unit)
+            if yr and yr not in subj_node['years']:
+                subj_node['years'].append(yr)
 
-        # Sort types and units within each subject node
+            # Dedicated PYQ hierarchy
+            if rtype == 'pyq':
+                pyq_sem_node  = pyqs_hierarchy.setdefault(sem, {})
+                pyq_dept_node = pyq_sem_node.setdefault(dept, {})
+                pyq_subj_node = pyq_dept_node.setdefault(subj, {'years': [], 'sessions': []})
+                if yr and yr not in pyq_subj_node['years']:
+                    pyq_subj_node['years'].append(yr)
+                if sess and sess not in pyq_subj_node['sessions']:
+                    pyq_subj_node['sessions'].append(sess)
+
+        # Sort within each subject node (years: Newest → Oldest)
+        def year_sort_key(y_str):
+            nums = re.findall(r'\d{4}', y_str)
+            return int(nums[0]) if nums else 0
+
         for sem_val in hierarchy.values():
             for dept_val in sem_val.values():
                 for subj_val in dept_val.values():
                     subj_val['types'].sort()
                     subj_val['units'].sort()
+                    subj_val['years'].sort(key=year_sort_key, reverse=True)
+
+        for sem_val in pyqs_hierarchy.values():
+            for dept_val in sem_val.values():
+                for subj_val in dept_val.values():
+                    subj_val['years'].sort(key=year_sort_key, reverse=True)
+                    subj_val['sessions'].sort()
 
         return Response({
             'semesters':      semesters,
             'departments':    departments,
             'resource_types': resource_types_labeled,
             'units':          units,
+            'years':          years,
             'hierarchy':      hierarchy,
+            'pyqs_hierarchy': pyqs_hierarchy,
         })
 

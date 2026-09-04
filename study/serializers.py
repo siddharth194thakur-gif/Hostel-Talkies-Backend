@@ -25,6 +25,8 @@ class StudyResourceSerializer(serializers.ModelSerializer):
             'semester',
             'department',
             'unit',
+            'year',
+            'exam_session',
             'file',
             'external_link',
             'author',

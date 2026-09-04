@@ -1,196 +1,378 @@
-from rest_framework import views, viewsets, permissions, status, response
+from rest_framework import viewsets, permissions, status, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
-from .models import GamingProfile, Tournament
-from .serializers import GamingProfileSerializer, TournamentSerializer
-from .services import FreeFireService, fetch_freefire_profile
+from django.utils import timezone
 
-class FetchFreeFireStatsAPIView(views.APIView):
+from .models import Competition, CompetitionParticipant, CompetitionResult
+from .serializers import (
+    CompetitionSerializer,
+    CompetitionParticipantSerializer,
+    CompetitionResultSerializer,
+)
+
+class IsOrganizerOrAdminOrReadOnly(permissions.BasePermission):
     """
-    Public / Authenticated endpoint to auto-lookup Free Fire player info by UID.
-    Uses FreeFireService with multi-provider fallback, caching (5 min) & rate-limiting.
+    Allow any user to view competitions and participate (join, leave, submit_result).
+    Only the creator or admin can update, delete, verify results, or manage settings.
     """
-    permission_classes = [permissions.AllowAny]
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        if not request.user or not request.user.is_authenticated:
+            return False
 
-    def get_client_ip(self, request):
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            return x_forwarded_for.split(',')[0].strip()
-        return request.META.get('REMOTE_ADDR', '')
+        # Participant actions allowed for any authenticated user
+        if getattr(view, 'action', None) in ['join', 'leave', 'submit_result']:
+            return True
 
-    def get(self, request):
-        uid = request.query_params.get('uid', '').strip()
-        region = request.query_params.get('region', 'IND').strip()
-        return self._lookup(request, uid, region)
-
-    def post(self, request):
-        uid = request.data.get('uid', '').strip()
-        region = request.data.get('region', 'IND').strip()
-        return self._lookup(request, uid, region)
-
-    def _lookup(self, request, uid, region):
-        if not uid:
-            return response.Response(
-                {'success': False, 'error': 'Free Fire UID is required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        client_ip = self.get_client_ip(request)
-        data = FreeFireService.get_player_profile(uid, region=region, client_ip=client_ip)
-        return response.Response(data, status=status.HTTP_200_OK)
-
-
-class MyGamingProfileView(views.APIView):
-    """
-    Retrieve or update the logged-in user's gaming profile.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        game_type = request.query_params.get('game_type', 'free_fire')
-        profile = GamingProfile.objects.filter(user=request.user, game_type=game_type).first()
-        if not profile:
-            return response.Response({'profile': None})
-        serializer = GamingProfileSerializer(profile, context={'request': request})
-        return response.Response({'profile': serializer.data})
-
-    def post(self, request):
-        game_type = request.data.get('game_type', 'free_fire')
-        uid = request.data.get('uid', '').strip()
-        region = request.data.get('region', 'IND').strip() or 'IND'
-
-        if not uid:
-            return response.Response(
-                {'error': 'Free Fire UID is required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Look up existing or create new
-        profile, created = GamingProfile.objects.get_or_create(
-            user=request.user,
-            game_type=game_type,
-            defaults={'uid': uid, 'in_game_name': request.data.get('in_game_name', f"Player_{uid[-4:]}")}
+        # Organizer actions restricted to creator or admin
+        return (
+            obj.creator_id == request.user.id
+            or request.user.is_staff
+            or getattr(request.user, 'is_hostel_admin', False)
+            or getattr(request.user, 'is_superuser', False)
         )
 
-        profile.uid = uid
-        profile.region = region
-        if 'in_game_name' in request.data and request.data.get('in_game_name'):
-            profile.in_game_name = request.data.get('in_game_name')
-        if 'level' in request.data and request.data.get('level') is not None:
-            profile.level = int(request.data.get('level'))
-        if 'likes' in request.data and request.data.get('likes') is not None:
-            profile.likes = int(request.data.get('likes'))
-        if 'br_rank' in request.data and request.data.get('br_rank'):
-            profile.br_rank = request.data.get('br_rank')
-        if 'br_rank_points' in request.data and request.data.get('br_rank_points') is not None:
-            profile.br_rank_points = int(request.data.get('br_rank_points'))
-        if 'cs_rank' in request.data and request.data.get('cs_rank'):
-            profile.cs_rank = request.data.get('cs_rank')
-        if 'kd_ratio' in request.data and request.data.get('kd_ratio') is not None:
-            profile.kd_ratio = float(request.data.get('kd_ratio'))
-        if 'total_booyahs' in request.data and request.data.get('total_booyahs') is not None:
-            profile.total_booyahs = int(request.data.get('total_booyahs'))
-        if 'avatar_url' in request.data:
-            profile.avatar_url = request.data.get('avatar_url')
 
-        if 'proof_screenshot' in request.FILES:
-            profile.proof_screenshot = request.FILES['proof_screenshot']
+class CompetitionViewSet(viewsets.ModelViewSet):
+    serializer_class = CompetitionSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOrganizerOrAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'custom_game_name', 'description', 'rules', 'creator__first_name', 'creator__last_name', 'creator__username']
+    ordering_fields = ['start_datetime', 'created_at']
+    ordering = ['-start_datetime', '-created_at']
 
-        profile.is_verified = True
-        profile.save()
+    def get_queryset(self):
+        qs = Competition.objects.filter(is_active=True).select_related(
+            'creator', 'creator__profile', 'hostel'
+        ).prefetch_related(
+            'participants', 'participants__user', 'participants__user__profile',
+            'results', 'results__participant', 'results__participant__user'
+        )
 
-        serializer = GamingProfileSerializer(profile, context={'request': request})
-        return response.Response(
+        game = self.request.query_params.get('game')
+        if game:
+            if game in ['bgmi', 'bgmi_lite', 'free_fire_max', 'other']:
+                qs = qs.filter(game=game)
+
+        status_param = self.request.query_params.get('status')
+        if status_param in ['upcoming', 'registration_open', 'live', 'completed', 'cancelled']:
+            qs = qs.filter(status=status_param)
+
+        creator_param = self.request.query_params.get('creator')
+        if creator_param:
+            qs = qs.filter(creator_id=creator_param)
+
+        hostel_param = self.request.query_params.get('hostel')
+        if hostel_param:
+            qs = qs.filter(hostel_id=hostel_param)
+
+        my_joined = self.request.query_params.get('joined')
+        if my_joined and self.request.user.is_authenticated:
+            qs = qs.filter(participants__user=self.request.user, participants__status='registered')
+
+        search = self.request.query_params.get('search')
+        if search:
+            search = search.strip()
+            qs = qs.filter(
+                Q(name__icontains=search) |
+                Q(custom_game_name__icontains=search) |
+                Q(description__icontains=search) |
+                Q(rules__icontains=search) |
+                Q(creator__first_name__icontains=search) |
+                Q(creator__last_name__icontains=search) |
+                Q(creator__username__icontains=search)
+            )
+
+        return qs.distinct()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        hostel = getattr(user.profile, 'hostel', None) if hasattr(user, 'profile') else None
+        serializer.save(creator=user, hostel=hostel)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def join(self, request, pk=None):
+        competition = self.get_object()
+        user = request.user
+
+        if not competition.is_registration_open:
+            return Response(
+                {'detail': 'Registration for this competition is currently closed.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if CompetitionParticipant.objects.filter(competition=competition, user=user, status='registered').exists():
+            return Response(
+                {'detail': 'You have already registered for this competition.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        in_game_name = request.data.get('in_game_name', '').strip()
+        if not in_game_name:
+            in_game_name = user.first_name or user.username
+
+        # Informational only game UID (NO external API fetch)
+        game_uid = request.data.get('game_uid', '').strip()
+        team_name = request.data.get('team_name', '').strip()
+        team_members = request.data.get('team_members', '').strip()
+        contact_number = request.data.get('contact_number', '').strip()
+
+        slot_number = competition.participants_count + 1
+
+        # Check existing participant record if previously left
+        participant = CompetitionParticipant.objects.filter(competition=competition, user=user).first()
+        if participant:
+            participant.in_game_name = in_game_name
+            participant.game_uid = game_uid
+            participant.team_name = team_name
+            participant.team_members = team_members
+            participant.contact_number = contact_number
+            participant.slot_number = slot_number
+            participant.status = 'registered'
+            participant.save()
+        else:
+            participant = CompetitionParticipant.objects.create(
+                competition=competition,
+                user=user,
+                in_game_name=in_game_name,
+                game_uid=game_uid,
+                team_name=team_name,
+                team_members=team_members,
+                contact_number=contact_number,
+                slot_number=slot_number,
+                status='registered'
+            )
+
+        serializer = self.get_serializer(competition, context={'request': request})
+        return Response(
             {
-                'message': 'Gaming Profile linked & competition score updated! 🏆',
-                'profile': serializer.data
+                'detail': f'Successfully registered slot #{slot_number} as {in_game_name}!',
+                'competition': serializer.data
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def leave(self, request, pk=None):
+        competition = self.get_object()
+        user = request.user
+
+        participant = CompetitionParticipant.objects.filter(competition=competition, user=user, status='registered').first()
+        if not participant:
+            return Response(
+                {'detail': 'You are not registered in this competition.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        participant.delete()
+        serializer = self.get_serializer(competition, context={'request': request})
+        return Response(
+            {
+                'detail': 'You have left the competition.',
+                'competition': serializer.data
             },
             status=status.HTTP_200_OK
         )
 
+    @action(detail=True, methods=['patch', 'post'], permission_classes=[permissions.IsAuthenticated])
+    def update_credentials(self, request, pk=None):
+        competition = self.get_object()
+        user = request.user
 
-class SyncStatsAPIView(views.APIView):
-    """
-    1-Click Auto-sync real stats from Free Fire server.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        game_type = request.data.get('game_type', 'free_fire')
-        profile = GamingProfile.objects.filter(user=request.user, game_type=game_type).first()
-        if not profile:
-            return response.Response({'error': 'Profile not found. Please register first.'}, status=status.HTTP_404_NOT_FOUND)
-
-        live_data = fetch_freefire_profile(profile.uid, region=profile.region or 'ind')
-        if live_data.get('success'):
-            profile.in_game_name = live_data.get('in_game_name') or profile.in_game_name
-            profile.level = live_data.get('level') or profile.level
-            profile.likes = live_data.get('likes') or profile.likes
-            profile.br_rank = live_data.get('br_rank') or profile.br_rank
-            profile.br_rank_points = live_data.get('br_rank_points') or profile.br_rank_points
-            profile.save()
-
-            serializer = GamingProfileSerializer(profile, context={'request': request})
-            return response.Response({
-                'message': 'Stats synced from game server! 🔥',
-                'profile': serializer.data
-            })
-        
-        return response.Response({'error': 'Could not sync live stats. Try again.'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class GamingLeaderboardView(views.APIView):
-    """
-    Leaderboard of all registered hostel players ranked by score descending.
-    """
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request):
-        game_type = request.query_params.get('game_type', 'free_fire')
-        hostel_id = request.query_params.get('hostel')
-        search = request.query_params.get('search', '').strip()
-
-        qs = GamingProfile.objects.filter(game_type=game_type).select_related(
-            'user', 'user__profile', 'user__profile__hostel', 'user__profile__block', 'user__profile__room'
-        )
-
-        if hostel_id:
-            qs = qs.filter(user__profile__hostel_id=hostel_id)
-
-        if search:
-            qs = qs.filter(
-                Q(in_game_name__icontains=search) |
-                Q(uid__icontains=search) |
-                Q(user__first_name__icontains=search) |
-                Q(user__username__icontains=search)
+        if competition.creator_id != user.id and not user.is_staff and not getattr(user, 'is_superuser', False):
+            return Response(
+                {'detail': 'Only the competition organizer can update Room ID and Password.'},
+                status=status.HTTP_403_FORBIDDEN
             )
 
-        profiles = qs.order_by('-score')[:100]
-        serializer = GamingProfileSerializer(profiles, many=True, context={'request': request})
+        room_id = request.data.get('room_id')
+        room_password = request.data.get('room_password')
+        status_val = request.data.get('status')
 
-        # Calculate statistics
-        total_players = qs.count()
-        top_booyahs = max([p.total_booyahs for p in profiles], default=0)
-        top_score = profiles[0].score if profiles.exists() else 0
+        if room_id is not None:
+            competition.room_id = str(room_id).strip()
+        if room_password is not None:
+            competition.room_password = str(room_password).strip()
+        if status_val in ['upcoming', 'registration_open', 'live', 'completed', 'cancelled']:
+            competition.status = status_val
 
-        return response.Response({
-            'results': serializer.data,
-            'total_players': total_players,
-            'top_score': top_score,
-            'top_booyahs': top_booyahs,
-        })
+        competition.save()
+        serializer = self.get_serializer(competition, context={'request': request})
+        return Response(
+            {
+                'detail': 'In-game credentials updated successfully.',
+                'competition': serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
 
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def toggle_registration(self, request, pk=None):
+        competition = self.get_object()
+        user = request.user
 
-class TournamentViewSet(viewsets.ModelViewSet):
-    """
-    Hostel Free Fire Custom Room Match / Tournament desk.
-    """
-    queryset = Tournament.objects.all()
-    serializer_class = TournamentSerializer
+        if competition.creator_id != user.id and not user.is_staff and not getattr(user, 'is_superuser', False):
+            return Response(
+                {'detail': 'Only the competition organizer can manage registration state.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
-    def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
-            return [permissions.AllowAny()]
-        return [permissions.IsAuthenticated()]
+        competition.is_registration_closed_by_organizer = not competition.is_registration_closed_by_organizer
+        competition.save()
+        
+        state_msg = "closed" if competition.is_registration_closed_by_organizer else "re-opened"
+        serializer = self.get_serializer(competition, context={'request': request})
+        return Response(
+            {
+                'detail': f'Registration has been {state_msg}.',
+                'competition': serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def submit_result(self, request, pk=None):
+        competition = self.get_object()
+        user = request.user
+
+        participant = CompetitionParticipant.objects.filter(competition=competition, user=user, status='registered').first()
+        is_organizer = competition.creator_id == user.id or user.is_staff or getattr(user, 'is_superuser', False)
+
+        # If organizer is submitting on behalf of a participant
+        participant_id = request.data.get('participant_id')
+        if is_organizer and participant_id:
+            participant = CompetitionParticipant.objects.filter(competition=competition, id=participant_id).first()
+
+        if not participant:
+            return Response(
+                {'detail': 'You are not registered in this competition.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        position = request.data.get('position')
+        kills = request.data.get('kills', 0)
+        score = request.data.get('score', '').strip()
+        points = request.data.get('points')
+        notes = request.data.get('notes', '').strip()
+        proof_image = request.FILES.get('proof_image')
+
+        # Points calculation if points_based rules exist and points not explicitly passed
+        pos_num = int(position) if position and str(position).isdigit() else None
+        kill_num = int(kills) if kills and str(kills).isdigit() else 0
+
+        calculated_points = 0.0
+        if points is not None and str(points).replace('.', '', 1).isdigit():
+            calculated_points = float(points)
+        elif competition.scoring_rules:
+            # e.g. points_per_kill and placement_points
+            ppk = float(competition.scoring_rules.get('points_per_kill', 1))
+            calculated_points += kill_num * ppk
+            if pos_num:
+                placement_table = competition.scoring_rules.get('placement_points', {})
+                calculated_points += float(placement_table.get(str(pos_num), 0))
+
+        # Direct auto-approval if submitted by organizer, else pending
+        init_status = 'approved' if is_organizer else 'pending'
+
+        result = CompetitionResult.objects.create(
+            competition=competition,
+            participant=participant,
+            position=pos_num,
+            kills=kill_num,
+            points=calculated_points,
+            score=score,
+            proof_image=proof_image,
+            notes=notes,
+            verification_status=init_status,
+            verified_by=user if is_organizer else None,
+            verified_at=timezone.now() if is_organizer else None,
+        )
+
+        serializer = self.get_serializer(competition, context={'request': request})
+        return Response(
+            {
+                'detail': 'Result submitted successfully!' if not is_organizer else 'Result entered and approved!',
+                'result': CompetitionResultSerializer(result, context={'request': request}).data,
+                'competition': serializer.data
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def verify_result(self, request, pk=None):
+        competition = self.get_object()
+        user = request.user
+
+        if competition.creator_id != user.id and not user.is_staff and not getattr(user, 'is_superuser', False):
+            return Response(
+                {'detail': 'Only the competition organizer can verify submitted results.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        result_id = request.data.get('result_id')
+        action_type = request.data.get('action') # 'approve' or 'reject'
+
+        if not result_id or action_type not in ['approve', 'reject']:
+            return Response(
+                {'detail': 'Valid result_id and action (approve/reject) are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = CompetitionResult.objects.filter(competition=competition, id=result_id).first()
+        if not result:
+            return Response(
+                {'detail': 'Result not found in this competition.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if action_type == 'approve':
+            result.verification_status = 'approved'
+            result.verified_by = user
+            result.verified_at = timezone.now()
+            # Allow optional point overrides on approval
+            override_points = request.data.get('points')
+            if override_points is not None and str(override_points).replace('.', '', 1).isdigit():
+                result.points = float(override_points)
+        else:
+            result.verification_status = 'rejected'
+            result.verified_by = user
+            result.verified_at = timezone.now()
+
+        result.save()
+        serializer = self.get_serializer(competition, context={'request': request})
+        return Response(
+            {
+                'detail': f'Result {action_type}d successfully!',
+                'result': CompetitionResultSerializer(result, context={'request': request}).data,
+                'competition': serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def pending_results(self, request, pk=None):
+        competition = self.get_object()
+        user = request.user
+
+        if competition.creator_id != user.id and not user.is_staff and not getattr(user, 'is_superuser', False):
+            return Response(
+                {'detail': 'Only the organizer can view pending results.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        pending = competition.results.filter(verification_status='pending').select_related(
+            'participant', 'participant__user'
+        ).order_by('-submitted_at')
+        return Response(CompetitionResultSerializer(pending, many=True, context={'request': request}).data)
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny])
+    def leaderboard(self, request, pk=None):
+        competition = self.get_object()
+        approved_results = competition.results.filter(verification_status='approved').select_related(
+            'participant', 'participant__user', 'participant__user__profile'
+        ).order_by('-points', 'position', '-kills', '-submitted_at')
+        return Response(CompetitionResultSerializer(approved_results, many=True, context={'request': request}).data)

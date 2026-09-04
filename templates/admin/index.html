@@ -22,7 +22,7 @@
       </div>
       <h1 class="ht-hero-title">Welcome back, {{ user.first_name|default:user.username }} 🛡️</h1>
       <p class="ht-hero-desc">
-        Real-time executive oversight across student resident verification, hostel infrastructure, Free Fire esports tournaments, community marketplace, and incident moderation triage.
+        Real-time executive oversight across student resident verification, hostel infrastructure, community marketplace, academic repository, and incident moderation triage.
       </p>
       
       <div class="ht-hero-actions">
@@ -33,10 +33,6 @@
         <a href="{% url 'admin:users_student_add' %}" class="ht-btn ht-btn-hero-primary" style="background: #ffffff; color: #0f172a;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
           <span>+ Enroll Student</span>
-        </a>
-        <a href="{% url 'admin:gaming_tournament_add' %}" class="ht-btn ht-btn-hero-primary" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color:#0f172a; border-color: rgba(255,255,255,0.4);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1h10c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1h-2c-.55 0-1-.45-1-1v-2.34"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path></svg>
-          <span>+ Esports Custom Room</span>
         </a>
         <a href="{% url 'admin:notices_notice_add' %}" class="ht-btn ht-btn-ghost">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
@@ -52,14 +48,14 @@
     <div class="ht-section-header">
       <div>
         <h2 class="ht-section-title">4K Campus Telemetry &amp; Key Performance Indicators</h2>
-        <p class="ht-section-subtitle">Real-time counts, safety flags, and esports records aggregated from active database</p>
+        <p class="ht-section-subtitle">Real-time counts, safety flags, and operational metrics aggregated from active database</p>
       </div>
       <div class="ht-badge-live">
         <span class="ht-live-indicator"></span> ⚡ Real-Time Live
       </div>
     </div>
 
-    <!-- 8-Card Responsive KPI Grid -->
+    <!-- 7-Card Responsive KPI Grid -->
     <div class="ht-kpi-grid">
       <!-- 1. Total Students -->
       <a href="{% url 'admin:users_student_changelist' %}" class="ht-kpi-card card-3d-luxury" style="border-top: 3px solid #4f46e5;">
@@ -117,20 +113,6 @@
         <div class="ht-kpi-value">{{ stats.total_study }}</div>
         <div class="ht-kpi-meta">
           <span>{{ stats.notes_count }} Notes • {{ stats.pyqs_count }} PYQs</span>
-        </div>
-      </a>
-
-      <!-- 5. Esports & Gaming Arena -->
-      <a href="{% url 'admin:gaming_gamingprofile_changelist' %}" class="ht-kpi-card card-3d-luxury" style="border-top: 3px solid #f59e0b;">
-        <div class="ht-kpi-header">
-          <span class="ht-kpi-label">Esports &amp; Free Fire</span>
-          <div class="ht-kpi-icon" style="background:#fef3c7; color:#f59e0b;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
-          </div>
-        </div>
-        <div class="ht-kpi-value" style="color: #b45309;">{{ stats.total_gamers }}</div>
-        <div class="ht-kpi-meta">
-          <span>{{ stats.verified_gamers }} Verified • {{ stats.total_tournaments }} Matches</span>
         </div>
       </a>
 

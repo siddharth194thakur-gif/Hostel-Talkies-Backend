@@ -184,14 +184,6 @@ class AdminDashboardStatsView(views.APIView):
         pending_feedback = Feedback.objects.filter(status='pending').count()
         total_hostels = Hostel.objects.count()
 
-        # Gamers count if gaming app is installed
-        total_gamers = 0
-        try:
-            from gaming.models import GamingProfile
-            total_gamers = GamingProfile.objects.count()
-        except Exception:
-            pass
-
         # Recent 8 registered students
         recent_students = User.objects.select_related('profile', 'profile__hostel').order_by('-date_joined')[:8]
         students_data = UserSerializer(recent_students, many=True, context={'request': request}).data
@@ -209,7 +201,6 @@ class AdminDashboardStatsView(views.APIView):
                 'total_reports': total_reports,
                 'pending_feedback': pending_feedback,
                 'total_hostels': total_hostels,
-                'total_gamers': total_gamers,
             },
             'recent_students': students_data,
             'recent_logs': logs_data,

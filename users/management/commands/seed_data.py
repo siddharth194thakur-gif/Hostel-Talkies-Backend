@@ -303,14 +303,14 @@ class Command(BaseCommand):
 
         # 6. Events
         Event.objects.get_or_create(
-            title='Inter-Hostel BGMI & Valorant LAN Tournament',
+            title='Inter-Hostel Badminton & Table Tennis Tournament',
             defaults={
-                'description': 'Join the ultimate hostel esports showdown! Bring your squad, battle it out in BGMI and Valorant, and win exciting cash prizes + trophy.',
+                'description': 'Join the intra-hostel sports showdown! Bring your racquets, represent your floor, and win medals + exciting prizes.',
                 'event_date': date.today() + timedelta(days=3),
                 'event_time': '18:00:00',
-                'location': 'Chanakya Recreation Hall & Online LAN',
+                'location': 'Chanakya Recreation Hall & Sports Arena',
                 'hostel': None,
-                'organizer': 'Campus Gaming Club & Hostel Council',
+                'organizer': 'Campus Sports Club & Hostel Council',
                 'created_by': admin_user,
                 'is_active': True
             }

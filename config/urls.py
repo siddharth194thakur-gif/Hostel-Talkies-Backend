@@ -13,11 +13,12 @@ from services.models import HostelService
 from study.models import StudyResource
 from hostels.models import Hostel
 from moderation.models import Report
+from gaming.models import Competition
 
 User = get_user_model()
 
 class GlobalSearchView(views.APIView):
-    """Unified search across people/profiles, posts, marketplace, notices, services, study resources, and events."""
+    """Unified search across people/profiles, posts, marketplace, notices, services, study resources, events, and gaming competitions."""
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
@@ -30,7 +31,9 @@ class GlobalSearchView(views.APIView):
                 'notices': [],
                 'events': [],
                 'services': [],
-                'study_resources': []
+                'study_resources': [],
+                'competitions': [],
+                'rooms': []
             })
 
         # People / User Profiles search (authenticated only to protect student privacy)
@@ -65,6 +68,15 @@ class GlobalSearchView(views.APIView):
             Q(title__icontains=query) | Q(course_name__icontains=query) | Q(course_code__icontains=query)
         )[:5]
 
+        competitions_qs = Competition.objects.filter(is_active=True).filter(
+            Q(name__icontains=query) | Q(game__icontains=query) | Q(custom_game_name__icontains=query)
+        )[:5]
+
+        comp_list = [
+            {'id': c.id, 'title': c.name, 'name': c.name, 'game': c.game_display, 'competition_type': c.competition_type, 'start_datetime': c.start_datetime, 'status': c.status}
+            for c in competitions_qs
+        ]
+
         return response.Response({
             'query': query,
             'people': people_data,
@@ -88,6 +100,8 @@ class GlobalSearchView(views.APIView):
                 {'id': r.id, 'title': r.title, 'resource_type': r.resource_type, 'course_name': r.course_name}
                 for r in study_qs
             ],
+            'competitions': comp_list,
+            'rooms': comp_list,
         })
 
 
@@ -139,10 +153,10 @@ urlpatterns = [
     path('api/events/', include('events.urls')),
     path('api/services/', include('services.urls')),
     path('api/study/', include('study.urls')),
+    path('api/gaming/', include('gaming.urls')),
     path('api/messages/', include('messaging.urls')),
     path('api/notifications/', include('notifications.urls')),
     path('api/moderation/', include('moderation.urls')),
-    path('api/gaming/', include('gaming.urls')),
     path('api/search/', GlobalSearchView.as_view(), name='global-search'),
     path('api/admin-stats/', AdminStatsView.as_view(), name='admin-stats'),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),

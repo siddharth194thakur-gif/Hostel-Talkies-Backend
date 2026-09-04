@@ -60,7 +60,6 @@ class Command(BaseCommand):
             {'name': 'Study Desks & Furniture', 'icon': 'armchair', 'post_type': 'all'},
             {'name': 'Lab Gear & Uniforms', 'icon': 'shirt', 'post_type': 'all'},
             {'name': 'Sports & Fitness Equipment', 'icon': 'dumbbell', 'post_type': 'all'},
-            {'name': 'Gaming & Entertainment', 'icon': 'gamepad', 'post_type': 'all'},
             {'name': 'Mess & Kitchen Appliances', 'icon': 'utensils', 'post_type': 'all'},
             {'name': 'Lost & Found Items', 'icon': 'search', 'post_type': 'all'},
             {'name': 'Roommate & Accommodation', 'icon': 'users', 'post_type': 'all'},

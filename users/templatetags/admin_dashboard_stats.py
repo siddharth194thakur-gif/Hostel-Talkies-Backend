@@ -107,20 +107,6 @@ def get_dashboard_stats():
     dismissed_reports = reports_qs.filter(status='dismissed').count()
     pending_feedback = Feedback.objects.filter(status='pending').count()
 
-    # Gaming & Esports
-    total_gamers = 0
-    verified_gamers = 0
-    total_tournaments = 0
-    active_tournaments = 0
-    try:
-        from gaming.models import GamingProfile, Tournament
-        total_gamers = GamingProfile.objects.count()
-        verified_gamers = GamingProfile.objects.filter(is_verified=True).count()
-        total_tournaments = Tournament.objects.count()
-        active_tournaments = Tournament.objects.filter(status__in=['upcoming', 'live']).count()
-    except Exception:
-        pass
-
     # Dynamic Hostel Overview List (Optimized batch queries)
     room_stats = {
         item['block__hostel_id']: item
@@ -206,11 +192,6 @@ def get_dashboard_stats():
         'resolved_reports': resolved_reports,
         'dismissed_reports': dismissed_reports,
         'pending_feedback': pending_feedback,
-
-        'total_gamers': total_gamers,
-        'verified_gamers': verified_gamers,
-        'total_tournaments': total_tournaments,
-        'active_tournaments': active_tournaments,
 
         # Complex Entities
         'hostels_summary': hostels_summary,
@@ -362,29 +343,5 @@ def get_changelist_kpis(app_label, model_name):
             {'label': 'Pending Feedback', 'value': fb_qs.filter(status='pending').count(), 'color': '#f59e0b', 'sub': 'Unreviewed'},
             {'label': 'Resolved', 'value': fb_qs.filter(status='resolved').count(), 'color': '#10b981', 'sub': 'Addressed'},
         ]
-    elif app_label == 'gaming' and model_name == 'gamingprofile':
-        try:
-            from gaming.models import GamingProfile
-            g_qs = GamingProfile.objects.all()
-            kpis = [
-                {'label': 'Total Gamers', 'value': g_qs.count(), 'color': '#8b5cf6', 'sub': 'Registered Profiles'},
-                {'label': 'Grandmasters', 'value': g_qs.filter(br_rank__icontains='Grandmaster').count(), 'color': '#f59e0b', 'sub': 'Top Tier Rank 👑'},
-                {'label': 'Verified Players', 'value': g_qs.filter(is_verified=True).count(), 'color': '#10b981', 'sub': 'UID Verified'},
-                {'label': 'Avg K/D Ratio', 'value': round(g_qs.aggregate(kd=Sum('kd_ratio'))['kd'] / (g_qs.count() or 1), 2), 'color': '#0284c7', 'sub': 'Skill Metric'},
-            ]
-        except Exception:
-            pass
-    elif app_label == 'gaming' and model_name == 'tournament':
-        try:
-            from gaming.models import Tournament
-            t_qs = Tournament.objects.all()
-            kpis = [
-                {'label': 'Total Matches', 'value': t_qs.count(), 'color': '#8b5cf6', 'sub': 'Custom Rooms'},
-                {'label': 'Upcoming Matches', 'value': t_qs.filter(status='upcoming').count(), 'color': '#f59e0b', 'sub': 'Scheduled'},
-                {'label': 'Live Rooms', 'value': t_qs.filter(status='live').count(), 'color': '#ef4444', 'sub': 'Playing Now 🔥'},
-                {'label': 'Completed', 'value': t_qs.filter(status='completed').count(), 'color': '#10b981', 'sub': 'Finished'},
-            ]
-        except Exception:
-            pass
 
     return kpis

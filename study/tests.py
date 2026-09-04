@@ -5,7 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase
 from rest_framework import status
 
-from .models import StudyResource
+from study.models import StudyResource
 from hostels.models import Hostel, Block, Room
 
 User = get_user_model()

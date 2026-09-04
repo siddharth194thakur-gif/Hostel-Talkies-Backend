@@ -14,3 +14,7 @@ python manage.py migrate --noinput
 # Auto-seed initial admin superuser and default hostels if database is fresh
 python manage.py setup_initial_data
 
+# Safely import and normalize authentic VBSPU academic study resources
+python manage.py import_vbspu_resources
+python manage.py normalize_study_resources
+

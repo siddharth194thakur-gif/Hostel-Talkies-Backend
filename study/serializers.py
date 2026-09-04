@@ -2,16 +2,51 @@ from rest_framework import serializers
 from .models import StudyResource
 from users.serializers import UserPublicSerializer
 
+
 class StudyResourceSerializer(serializers.ModelSerializer):
-    uploader_detail = UserPublicSerializer(source='uploader', read_only=True)
+    """
+    Student-facing serializer.
+    Source attribution fields (source_website, source_url) are intentionally
+    excluded — they are internal import metadata, not student-facing content.
+    """
+    uploader_detail      = UserPublicSerializer(source='uploader', read_only=True)
     resource_type_display = serializers.CharField(source='get_resource_type_display', read_only=True)
 
     class Meta:
-        model = StudyResource
+        model  = StudyResource
         fields = [
-            'id', 'title', 'description', 'resource_type', 'resource_type_display',
-            'course_name', 'course_code', 'semester', 'department',
-            'file', 'external_link', 'uploader', 'uploader_detail',
-            'downloads_count', 'is_active', 'created_at'
+            'id',
+            'title',
+            'description',
+            'resource_type',
+            'resource_type_display',
+            'course_name',
+            'course_code',
+            'semester',
+            'department',
+            'unit',
+            'file',
+            'external_link',
+            'author',
+            'uploader',
+            'uploader_detail',
+            'downloads_count',
+            'is_active',
+            'needs_review',
+            'created_at',
         ]
         read_only_fields = ['id', 'uploader', 'downloads_count', 'is_active', 'created_at']
+
+
+class StudyResourceAdminSerializer(serializers.ModelSerializer):
+    """
+    Admin-only serializer — includes internal source attribution fields
+    so administrators can trace the origin of imported resources.
+    """
+    uploader_detail      = UserPublicSerializer(source='uploader', read_only=True)
+    resource_type_display = serializers.CharField(source='get_resource_type_display', read_only=True)
+
+    class Meta:
+        model  = StudyResource
+        fields = '__all__'
+        read_only_fields = ['id', 'uploader', 'downloads_count', 'created_at']

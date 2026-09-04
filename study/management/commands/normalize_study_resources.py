@@ -111,6 +111,17 @@ class Command(BaseCommand):
                 dead_removed += 1
                 continue
 
+            # ── 1b. Clean unwanted decorative symbols from title (∆☮) ────────
+            from urllib.parse import unquote
+            unquoted_title = unquote(r.title)
+            cleaned_title = re.sub(r'[\s\-_(]*[💙~]*[∆\u2206][☮\u262e\ufe0f]+[💙~]*[\s\-_)]*', ' ', unquoted_title)
+            cleaned_title = re.sub(r'[\s~]{2,}', ' ', cleaned_title)
+            cleaned_title = re.sub(r'\s+', ' ', cleaned_title).strip()
+            if cleaned_title != r.title:
+                self.stdout.write(f'  [TITLE-CLEAN] id={r.id} "{r.title}" → "{cleaned_title}"')
+                r.title = cleaned_title
+                dirty = True
+
             # ── 2. Normalise semester string ──────────────────────────────────
             raw_sem = r.semester.strip()
             if raw_sem.lower() in SEM_NORM:

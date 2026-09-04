@@ -37,6 +37,18 @@ class StudyResourceSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'uploader', 'downloads_count', 'is_active', 'created_at']
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        title = ret.get('title')
+        if title:
+            import re
+            from urllib.parse import unquote
+            t = unquote(title)
+            t = re.sub(r'[\s\-_(]*[💙~]*[∆\u2206][☮\u262e\ufe0f]+[💙~]*[\s\-_)]*', ' ', t)
+            t = re.sub(r'[\s~]{2,}', ' ', t)
+            ret['title'] = re.sub(r'\s+', ' ', t).strip()
+        return ret
+
 
 class StudyResourceAdminSerializer(serializers.ModelSerializer):
     """

@@ -271,11 +271,15 @@ class Command(BaseCommand):
                     clean_title = ''
 
         # Clean symbols from title
-        clean_title = clean_title.replace('~', ' ').replace('&#8710;', ' ').replace('&#9774;', ' ').replace('&#11015;', ' ').replace('👉', ' ').replace('📥', ' ').replace('📄', ' ').replace('📘', ' ').replace('📝', ' ').replace('📋', ' ')
+        from urllib.parse import unquote
+        clean_title = unquote(clean_title)
+        clean_title = re.sub(r'[\s\-_(]*[💙~]*[∆\u2206&#8710;]+[☮\u262e&#9774;\ufe0f]+[💙~]*[\s\-_)]*', ' ', clean_title)
+        clean_title = clean_title.replace('~', ' ').replace('&#11015;', ' ').replace('👉', ' ').replace('📥', ' ').replace('📄', ' ').replace('📘', ' ').replace('📝', ' ').replace('📋', ' ')
         clean_title = re.sub(r'vbspuEDU', '', clean_title, flags=re.I)
         clean_title = re.sub(r'vbspu', '', clean_title, flags=re.I)
         clean_title = re.sub(r'@yoyo67am', '', clean_title, flags=re.I)
         clean_title = re.sub(r'\(.*?(?:dark|student).*?\)', '', clean_title, flags=re.I)
+        clean_title = re.sub(r'[\s~]{2,}', ' ', clean_title)
         clean_title = re.sub(r'\s+', ' ', clean_title).strip()
         clean_title = re.sub(r'^(download\s*:?|view\s*:?)\s*', '', clean_title, flags=re.I).strip()
 

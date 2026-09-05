@@ -2,7 +2,7 @@ import re
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q, F
+from django.db.models import Q, F, Count
 from .models import StudyResource
 from .serializers import StudyResourceSerializer, StudyResourceAdminSerializer
 from users.permissions import IsChiefAdminOrReadOnly
@@ -203,10 +203,16 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
                     subj_val['years'].sort(key=year_sort_key, reverse=True)
                     subj_val['sessions'].sort()
 
+        type_counts = dict(
+            qs.values('resource_type').annotate(cnt=Count('id')).values_list('resource_type', 'cnt')
+        )
+
         return Response({
             'semesters':      semesters,
             'departments':    departments,
             'resource_types': resource_types_labeled,
+            'type_counts':    type_counts,
+            'total_count':    qs.count(),
             'units':          units,
             'years':          years,
             'hierarchy':      hierarchy,

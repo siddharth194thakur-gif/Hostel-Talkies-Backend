@@ -23,85 +23,233 @@ class GlobalSearchView(views.APIView):
 
     def get(self, request):
         query = request.query_params.get('q', '').strip()
-        if not query or len(query) < 2:
-            return response.Response({
-                'query': query,
-                'people': [],
-                'posts': [],
-                'notices': [],
-                'events': [],
-                'services': [],
-                'study_resources': [],
-                'competitions': [],
-                'rooms': []
-            })
+        clean_user_query = query.lstrip('@').strip()
+        clean_id = clean_user_query.lstrip('#')
+        is_numeric_id = clean_id.isdigit()
+        id_num = int(clean_id) if is_numeric_id else None
 
-        # People / User Profiles search (authenticated only to protect student privacy)
+        empty_result = {
+            'query': query,
+            'people': [],
+            'posts': [],
+            'notices': [],
+            'events': [],
+            'services': [],
+            'study_resources': [],
+            'competitions': [],
+            'rooms': [],
+            'count': 0
+        }
+
+        if not query or (len(query) < 1 and not is_numeric_id):
+            return response.Response(empty_result)
+
+        # 1. People / User Profiles search
         people_data = []
-        if request.user and request.user.is_authenticated:
-            users_qs = User.objects.filter(is_active=True, is_blocked=False).filter(
-                Q(first_name__icontains=query) |
-                Q(last_name__icontains=query) |
-                Q(username__icontains=query)
-            ).select_related('profile', 'profile__hostel', 'profile__block', 'profile__room')[:8]
-
+        try:
+            from django.db.models import Value, Case, When, IntegerField
+            from django.db.models.functions import Concat
             from users.serializers import UserPublicSerializer
+
+            users_qs = User.objects.filter(is_active=True, is_blocked=False).annotate(
+                full_name_concat=Concat('first_name', Value(' '), 'last_name')
+            )
+
+            user_filter = (
+                Q(username__iexact=clean_user_query) |
+                Q(username__icontains=clean_user_query) |
+                Q(first_name__icontains=clean_user_query) |
+                Q(last_name__icontains=clean_user_query) |
+                Q(full_name_concat__icontains=clean_user_query) |
+                Q(profile__branch__icontains=clean_user_query) |
+                Q(profile__programme__icontains=clean_user_query) |
+                Q(profile__bio__icontains=clean_user_query)
+            )
+            if id_num is not None:
+                user_filter |= Q(id=id_num)
+
+            ordering = []
+            if id_num is not None:
+                users_qs = users_qs.annotate(
+                    exact_id=Case(
+                        When(id=id_num, then=Value(1)),
+                        default=Value(0),
+                        output_field=IntegerField()
+                    )
+                )
+                ordering.append('-exact_id')
+
+            users_qs = users_qs.annotate(
+                exact_username=Case(
+                    When(username__iexact=clean_user_query, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField()
+                )
+            )
+            ordering.extend(['-exact_username', 'username'])
+
+            users_qs = users_qs.filter(user_filter).order_by(*ordering).select_related(
+                'profile', 'profile__hostel', 'profile__block', 'profile__room'
+            )[:15]
+
             people_data = UserPublicSerializer(users_qs, many=True, context={'request': request}).data
+        except Exception:
+            people_data = []
 
-        posts_qs = Post.objects.filter(is_deleted=False, is_hidden=False, status='available').filter(
-            Q(title__icontains=query) | Q(description__icontains=query) | Q(location__icontains=query)
-        )[:10]
+        # 2. Posts & Marketplace items
+        posts_data = []
+        try:
+            posts_qs = Post.objects.filter(is_deleted=False, is_hidden=False).filter(
+                Q(title__icontains=query) |
+                Q(description__icontains=query) |
+                Q(location__icontains=query) |
+                Q(category__name__icontains=query) |
+                Q(author__username__icontains=query) |
+                Q(author__first_name__icontains=query) |
+                Q(author__last_name__icontains=query)
+            ).select_related('author', 'category')[:15]
 
-        notices_qs = Notice.objects.filter(is_active=True).filter(
-            Q(title__icontains=query) | Q(content__icontains=query)
-        )[:5]
+            posts_data = [
+                {
+                    'id': p.id,
+                    'title': p.title,
+                    'post_type': p.post_type,
+                    'price': str(p.price) if p.price else None,
+                    'created_at': p.created_at.isoformat() if hasattr(p.created_at, 'isoformat') else str(p.created_at)
+                }
+                for p in posts_qs
+            ]
+        except Exception:
+            posts_data = []
 
-        events_qs = Event.objects.filter(is_active=True).filter(
-            Q(title__icontains=query) | Q(description__icontains=query) | Q(location__icontains=query)
-        )[:5]
+        # 3. Official Notices
+        notices_data = []
+        try:
+            notices_qs = Notice.objects.filter(is_active=True).filter(
+                Q(title__icontains=query) | Q(content__icontains=query)
+            )[:10]
 
-        services_qs = HostelService.objects.filter(is_active=True).filter(
-            Q(name__icontains=query) | Q(description__icontains=query) | Q(location__icontains=query)
-        )[:5]
+            notices_data = [
+                {
+                    'id': n.id,
+                    'title': n.title,
+                    'priority': n.priority,
+                    'publish_date': str(n.publish_date)
+                }
+                for n in notices_qs
+            ]
+        except Exception:
+            notices_data = []
 
-        study_qs = StudyResource.objects.filter(is_active=True).filter(
-            Q(title__icontains=query) | Q(course_name__icontains=query) | Q(course_code__icontains=query)
-        )[:5]
+        # 4. Campus / Hostel Events
+        events_data = []
+        try:
+            events_qs = Event.objects.filter(is_active=True).filter(
+                Q(title__icontains=query) | Q(description__icontains=query) | Q(location__icontains=query)
+            )[:10]
 
-        competitions_qs = Competition.objects.filter(is_active=True).filter(
-            Q(name__icontains=query) | Q(game__icontains=query) | Q(custom_game_name__icontains=query)
-        )[:5]
+            events_data = [
+                {
+                    'id': e.id,
+                    'title': e.title,
+                    'event_date': str(e.event_date),
+                    'location': e.location
+                }
+                for e in events_qs
+            ]
+        except Exception:
+            events_data = []
 
-        comp_list = [
-            {'id': c.id, 'title': c.name, 'name': c.name, 'game': c.game_display, 'competition_type': c.competition_type, 'start_datetime': c.start_datetime, 'status': c.status}
-            for c in competitions_qs
-        ]
+        # 5. Hostel Services
+        services_data = []
+        try:
+            services_qs = HostelService.objects.filter(is_active=True).filter(
+                Q(name__icontains=query) |
+                Q(description__icontains=query) |
+                Q(location__icontains=query) |
+                Q(contact_person__icontains=query) |
+                Q(category__icontains=query)
+            )[:10]
+
+            services_data = [
+                {
+                    'id': s.id,
+                    'name': s.name,
+                    'category': s.category,
+                    'location': s.location
+                }
+                for s in services_qs
+            ]
+        except Exception:
+            services_data = []
+
+        # 6. Study Resources & PYQs
+        study_data = []
+        try:
+            study_qs = StudyResource.objects.filter(is_active=True).filter(
+                Q(title__icontains=query) |
+                Q(course_name__icontains=query) |
+                Q(course_code__icontains=query) |
+                Q(department__icontains=query) |
+                Q(description__icontains=query) |
+                Q(resource_type__icontains=query)
+            )[:15]
+
+            study_data = [
+                {
+                    'id': r.id,
+                    'title': r.title,
+                    'resource_type': r.resource_type,
+                    'course_name': r.course_name
+                }
+                for r in study_qs
+            ]
+        except Exception:
+            study_data = []
+
+        # 7. Gaming Competitions (safe optional query)
+        comp_list = []
+        try:
+            from gaming.models import Competition
+            competitions_qs = Competition.objects.filter(is_active=True).filter(
+                Q(name__icontains=query) | Q(game__icontains=query) | Q(custom_game_name__icontains=query)
+            )[:10]
+            comp_list = [
+                {
+                    'id': c.id,
+                    'title': c.name,
+                    'name': c.name,
+                    'game': getattr(c, 'game_display', c.game),
+                    'competition_type': c.competition_type,
+                    'start_datetime': c.start_datetime.isoformat() if hasattr(c.start_datetime, 'isoformat') else str(c.start_datetime),
+                    'status': c.status
+                }
+                for c in competitions_qs
+            ]
+        except Exception:
+            comp_list = []
+
+        total_count = (
+            len(people_data) +
+            len(posts_data) +
+            len(notices_data) +
+            len(events_data) +
+            len(services_data) +
+            len(study_data) +
+            len(comp_list)
+        )
 
         return response.Response({
             'query': query,
             'people': people_data,
-            'posts': [
-                {'id': p.id, 'title': p.title, 'post_type': p.post_type, 'price': str(p.price) if p.price else None, 'created_at': p.created_at}
-                for p in posts_qs
-            ],
-            'notices': [
-                {'id': n.id, 'title': n.title, 'priority': n.priority, 'publish_date': n.publish_date}
-                for n in notices_qs
-            ],
-            'events': [
-                {'id': e.id, 'title': e.title, 'event_date': e.event_date, 'location': e.location}
-                for e in events_qs
-            ],
-            'services': [
-                {'id': s.id, 'name': s.name, 'category': s.category, 'location': s.location}
-                for s in services_qs
-            ],
-            'study_resources': [
-                {'id': r.id, 'title': r.title, 'resource_type': r.resource_type, 'course_name': r.course_name}
-                for r in study_qs
-            ],
+            'posts': posts_data,
+            'notices': notices_data,
+            'events': events_data,
+            'services': services_data,
+            'study_resources': study_data,
             'competitions': comp_list,
             'rooms': comp_list,
+            'count': total_count
         })
 
 

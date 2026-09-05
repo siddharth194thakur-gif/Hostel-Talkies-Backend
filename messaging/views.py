@@ -15,6 +15,7 @@ from .serializers import (
 )
 from users.permissions import IsNotBlockedOrSuspended
 from users.models import UserBlock
+from users.serializers import UserPublicSerializer
 from notifications.models import Notification
 
 User = get_user_model()
@@ -518,12 +519,48 @@ class AvailableMembersView(views.APIView):
         search = request.query_params.get('search', '').strip()
         qs = User.objects.filter(is_active=True, is_blocked=False).exclude(id=request.user.id)
         if search:
-            qs = qs.filter(
-                Q(first_name__icontains=search) |
-                Q(last_name__icontains=search) |
-                Q(email__icontains=search) |
-                Q(username__icontains=search)
+            clean_user_query = search.lstrip('@').strip()
+            clean_id = clean_user_query.lstrip('#')
+            is_numeric_id = clean_id.isdigit()
+            id_num = int(clean_id) if is_numeric_id else None
+
+            from django.db.models import Value, Case, When, IntegerField
+            from django.db.models.functions import Concat
+
+            qs = qs.annotate(
+                full_name_concat=Concat('first_name', Value(' '), 'last_name')
             )
+            user_filter = (
+                Q(username__iexact=clean_user_query) |
+                Q(username__icontains=clean_user_query) |
+                Q(first_name__icontains=clean_user_query) |
+                Q(last_name__icontains=clean_user_query) |
+                Q(full_name_concat__icontains=clean_user_query)
+            )
+            if id_num is not None:
+                user_filter |= Q(id=id_num)
+
+            ordering = []
+            if id_num is not None:
+                qs = qs.annotate(
+                    exact_id=Case(
+                        When(id=id_num, then=Value(1)),
+                        default=Value(0),
+                        output_field=IntegerField()
+                    )
+                )
+                ordering.append('-exact_id')
+
+            qs = qs.annotate(
+                exact_username=Case(
+                    When(username__iexact=clean_user_query, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField()
+                )
+            )
+            ordering.extend(['-exact_username', 'username'])
+            qs = qs.filter(user_filter).order_by(*ordering)
+
         qs = qs.select_related('profile__hostel')[:30]
         serializer = UserPublicSerializer(qs, many=True, context={'request': request})
         return Response(serializer.data)

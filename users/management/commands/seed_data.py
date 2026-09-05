@@ -264,6 +264,33 @@ class Command(BaseCommand):
             }
         )
 
+        # Student 5: Saurabh Kumar (Aryabhata, Block A1)
+        saurabh, _ = User.objects.get_or_create(
+            email='saurabh@student.edu',
+            defaults={
+                'username': 'saurabh',
+                'first_name': 'Saurabh',
+                'last_name': 'Kumar',
+                'is_student': True,
+            }
+        )
+        saurabh.first_name = 'Saurabh'
+        saurabh.last_name = 'Kumar'
+        saurabh.set_password('Student@12345')
+        saurabh.save()
+
+        StudentProfile.objects.update_or_create(
+            user=saurabh,
+            defaults={
+                'hostel': h_aryabhata,
+                'block': b_a1,
+                'bio': '3rd Year Computer Science student. Web developer and campus tech enthusiast.',
+                'programme': 'B.Tech',
+                'branch': 'Computer Science & Engineering',
+                'phone_number': '+91 9876501234',
+            }
+        )
+
         # 5. Notices
         Notice.objects.get_or_create(
             title='Hostel Wi-Fi Network Upgrade & Maintenance',

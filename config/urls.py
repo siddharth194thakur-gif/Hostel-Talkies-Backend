@@ -6,6 +6,7 @@ from rest_framework import views, permissions, response
 from django.db.models import Q, Count
 from django.contrib.auth import get_user_model
 
+import logging
 from posts.models import Post, Category
 from notices.models import Notice
 from events.models import Event
@@ -15,6 +16,7 @@ from hostels.models import Hostel
 from moderation.models import Report
 from gaming.models import Competition
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 class GlobalSearchView(views.APIView):
@@ -22,7 +24,12 @@ class GlobalSearchView(views.APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        query = request.query_params.get('q', '').strip()
+        query = (
+            request.query_params.get('q') or
+            request.query_params.get('query') or
+            request.query_params.get('search') or
+            ''
+        ).strip()
         clean_user_query = query.lstrip('@').strip()
         clean_id = clean_user_query.lstrip('#')
         is_numeric_id = clean_id.isdigit()
@@ -41,7 +48,7 @@ class GlobalSearchView(views.APIView):
             'count': 0
         }
 
-        if not query or (len(query) < 1 and not is_numeric_id):
+        if not query:
             return response.Response(empty_result)
 
         # 1. People / User Profiles search
@@ -63,9 +70,12 @@ class GlobalSearchView(views.APIView):
                 Q(full_name_concat__icontains=clean_user_query) |
                 Q(profile__branch__icontains=clean_user_query) |
                 Q(profile__programme__icontains=clean_user_query) |
-                Q(profile__bio__icontains=clean_user_query)
+                Q(profile__bio__icontains=clean_user_query) |
+                Q(profile__hostel__name__icontains=clean_user_query)
             )
-            if id_num is not None:
+            if clean_user_query.lower() in ['people', 'student', 'students', 'user', 'users']:
+                user_filter = Q(is_student=True)
+            elif id_num is not None:
                 user_filter |= Q(id=id_num)
 
             ordering = []
@@ -93,21 +103,38 @@ class GlobalSearchView(views.APIView):
             )[:15]
 
             people_data = UserPublicSerializer(users_qs, many=True, context={'request': request}).data
-        except Exception:
+        except Exception as e:
+            logger.error("Error in GlobalSearchView (people): %s", e)
             people_data = []
 
         # 2. Posts & Marketplace items
         posts_data = []
         try:
-            posts_qs = Post.objects.filter(is_deleted=False, is_hidden=False).filter(
+            user = getattr(request, 'user', None)
+            is_staff = getattr(user, 'is_staff', False)
+            if is_staff:
+                visibility_filter = Q(is_deleted=False)
+            elif user and getattr(user, 'is_authenticated', False):
+                visibility_filter = Q(is_deleted=False) & (Q(is_hidden=False) | Q(author=user))
+            else:
+                visibility_filter = Q(is_deleted=False, is_hidden=False)
+
+            post_query_filter = (
                 Q(title__icontains=query) |
                 Q(description__icontains=query) |
                 Q(location__icontains=query) |
                 Q(category__name__icontains=query) |
+                Q(post_type__icontains=query) |
                 Q(author__username__icontains=query) |
                 Q(author__first_name__icontains=query) |
                 Q(author__last_name__icontains=query)
-            ).select_related('author', 'category')[:15]
+            )
+            if query.lower() in ['post', 'posts', 'marketplace', 'listing', 'listings']:
+                post_query_filter = Q(id__isnull=False)
+
+            posts_qs = Post.objects.filter(visibility_filter).filter(
+                post_query_filter
+            ).select_related('author', 'category').order_by('-created_at')[:15]
 
             posts_data = [
                 {
@@ -119,15 +146,25 @@ class GlobalSearchView(views.APIView):
                 }
                 for p in posts_qs
             ]
-        except Exception:
+        except Exception as e:
+            logger.error("Error in GlobalSearchView (posts): %s", e)
             posts_data = []
 
         # 3. Official Notices
         notices_data = []
         try:
+            notice_filter = (
+                Q(title__icontains=query) |
+                Q(content__icontains=query) |
+                Q(priority__icontains=query) |
+                Q(target_hostel__name__icontains=query)
+            )
+            if query.lower() in ['notice', 'notices', 'announcement', 'announcements']:
+                notice_filter = Q(id__isnull=False)
+
             notices_qs = Notice.objects.filter(is_active=True).filter(
-                Q(title__icontains=query) | Q(content__icontains=query)
-            )[:10]
+                notice_filter
+            ).order_by('-priority', '-publish_date')[:10]
 
             notices_data = [
                 {
@@ -138,15 +175,26 @@ class GlobalSearchView(views.APIView):
                 }
                 for n in notices_qs
             ]
-        except Exception:
+        except Exception as e:
+            logger.error("Error in GlobalSearchView (notices): %s", e)
             notices_data = []
 
         # 4. Campus / Hostel Events
         events_data = []
         try:
+            event_filter = (
+                Q(title__icontains=query) |
+                Q(description__icontains=query) |
+                Q(location__icontains=query) |
+                Q(organizer__icontains=query) |
+                Q(hostel__name__icontains=query)
+            )
+            if query.lower() in ['event', 'events']:
+                event_filter = Q(id__isnull=False)
+
             events_qs = Event.objects.filter(is_active=True).filter(
-                Q(title__icontains=query) | Q(description__icontains=query) | Q(location__icontains=query)
-            )[:10]
+                event_filter
+            ).order_by('event_date')[:10]
 
             events_data = [
                 {
@@ -157,19 +205,27 @@ class GlobalSearchView(views.APIView):
                 }
                 for e in events_qs
             ]
-        except Exception:
+        except Exception as e:
+            logger.error("Error in GlobalSearchView (events): %s", e)
             events_data = []
 
         # 5. Hostel Services
         services_data = []
         try:
-            services_qs = HostelService.objects.filter(is_active=True).filter(
+            service_filter = (
                 Q(name__icontains=query) |
+                Q(category__icontains=query) |
                 Q(description__icontains=query) |
                 Q(location__icontains=query) |
                 Q(contact_person__icontains=query) |
-                Q(category__icontains=query)
-            )[:10]
+                Q(hostel__name__icontains=query)
+            )
+            if query.lower() in ['service', 'services']:
+                service_filter = Q(id__isnull=False)
+
+            services_qs = HostelService.objects.filter(is_active=True).filter(
+                service_filter
+            ).order_by('category', 'name')[:10]
 
             services_data = [
                 {
@@ -180,20 +236,28 @@ class GlobalSearchView(views.APIView):
                 }
                 for s in services_qs
             ]
-        except Exception:
+        except Exception as e:
+            logger.error("Error in GlobalSearchView (services): %s", e)
             services_data = []
 
         # 6. Study Resources & PYQs
         study_data = []
         try:
-            study_qs = StudyResource.objects.filter(is_active=True).filter(
+            study_filter = (
                 Q(title__icontains=query) |
                 Q(course_name__icontains=query) |
                 Q(course_code__icontains=query) |
                 Q(department__icontains=query) |
                 Q(description__icontains=query) |
-                Q(resource_type__icontains=query)
-            )[:15]
+                Q(resource_type__icontains=query) |
+                Q(author__icontains=query)
+            )
+            if query.lower() in ['study', 'resource', 'resources', 'pyq', 'pyqs']:
+                study_filter = Q(id__isnull=False)
+
+            study_qs = StudyResource.objects.filter(is_active=True, is_pending_review=False).filter(
+                study_filter
+            ).order_by('-downloads_count')[:15]
 
             study_data = [
                 {
@@ -204,16 +268,27 @@ class GlobalSearchView(views.APIView):
                 }
                 for r in study_qs
             ]
-        except Exception:
+        except Exception as e:
+            logger.error("Error in GlobalSearchView (study): %s", e)
             study_data = []
 
         # 7. Gaming Competitions (safe optional query)
         comp_list = []
         try:
             from gaming.models import Competition
+            competition_filter = (
+                Q(name__icontains=query) |
+                Q(game__icontains=query) |
+                Q(custom_game_name__icontains=query) |
+                Q(description__icontains=query) |
+                Q(rules__icontains=query)
+            )
+            if query.lower() in ['game', 'games', 'gaming', 'competition', 'competitions']:
+                competition_filter = Q(id__isnull=False)
+
             competitions_qs = Competition.objects.filter(is_active=True).filter(
-                Q(name__icontains=query) | Q(game__icontains=query) | Q(custom_game_name__icontains=query)
-            )[:10]
+                competition_filter
+            ).order_by('-start_datetime')[:10]
             comp_list = [
                 {
                     'id': c.id,
@@ -226,7 +301,8 @@ class GlobalSearchView(views.APIView):
                 }
                 for c in competitions_qs
             ]
-        except Exception:
+        except Exception as e:
+            logger.error("Error in GlobalSearchView (competitions): %s", e)
             comp_list = []
 
         total_count = (
@@ -306,6 +382,7 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     path('api/moderation/', include('moderation.urls')),
     path('api/search/', GlobalSearchView.as_view(), name='global-search'),
+    re_path(r'^api/search/?$', GlobalSearchView.as_view(), name='global-search-slash'),
     path('api/admin-stats/', AdminStatsView.as_view(), name='admin-stats'),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]

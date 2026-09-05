@@ -79,8 +79,9 @@ class UserPublicSerializer(serializers.ModelSerializer):
 
     def get_is_blocked_by_me(self, obj):
         request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            return UserBlock.objects.filter(blocker=request.user, blocked=obj).exists()
+        user = getattr(request, 'user', None)
+        if user and getattr(user, 'is_authenticated', False):
+            return UserBlock.objects.filter(blocker=user, blocked=obj).exists()
         return False
 
     def get_full_name(self, obj):

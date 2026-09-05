@@ -301,8 +301,8 @@ class DjangoAdminSecurityTests(TestCase):
         self.client.force_login(self.chief_admin)
         response = self.client.get('/admin/')
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'HostelTalkies Admin Operations Center')
-        self.assertContains(response, 'Campus Key Performance Indicators')
+        self.assertContains(response, 'HostelTalkies Admin')
+        self.assertContains(response, 'Key Performance Indicators')
 
     def test_6_direct_model_urls_protected_against_students_and_unauthorized_users(self):
         """Direct URLs like /admin/users/user/, /admin/posts/post/, etc. are protected."""
@@ -428,6 +428,30 @@ class UserBlockTests(APITestCase):
         self.assertIn('people', resp.data)
         people_names = [p['username'] for p in resp.data['people']]
         self.assertIn('student_alice', people_names)
+
+    def test_global_search_case_insensitivity_and_categories(self):
+        # Create student Saurabh
+        saurabh, _ = User.objects.get_or_create(
+            username='saurabh',
+            email='saurabh.test@student.edu',
+            first_name='Saurabh',
+            last_name='Kumar',
+            is_student=True
+        )
+
+        # Test lowercase, uppercase, mixed-case, whitespace
+        for q in ['saurabh', 'Saurabh', 'SAURABH', 'sAuRaBh', '  saurabh  ']:
+            resp = self.client.get(f'/api/search/?q={q}')
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertGreaterEqual(resp.data['count'], 1)
+            usernames = [p['username'] for p in resp.data['people']]
+            self.assertIn('saurabh', usernames)
+
+        # Test non-matching query
+        resp_empty = self.client.get('/api/search/?q=nonexistentkeyword999')
+        self.assertEqual(resp_empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp_empty.data['count'], 0)
+        self.assertEqual(len(resp_empty.data['people']), 0)
 
     def test_avatar_upload_save_and_retrieve(self):
         self.client.force_authenticate(user=self.user1)

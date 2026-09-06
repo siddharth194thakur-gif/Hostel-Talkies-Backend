@@ -30,7 +30,15 @@ class EventViewSet(viewsets.ModelViewSet):
                 Q(organizer__icontains=search)
             )
 
-        return queryset.order_by('event_date', 'event_time')
+        from django.db.models import Case, When, Value, IntegerField
+        return queryset.annotate(
+            is_featured_sih=Case(
+                When(title__icontains='Smart India Hackathon', then=Value(0)),
+                When(title__icontains='SIH', then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField()
+            )
+        ).order_by('is_featured_sih', 'event_date', 'event_time')
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)

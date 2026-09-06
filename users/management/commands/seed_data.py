@@ -378,6 +378,40 @@ class Command(BaseCommand):
 
         # 6. Events
         Event.objects.get_or_create(
+            title='Smart India Hackathon (SIH) 2026 – Internal Round',
+            defaults={
+                'description': (
+                    "Smart India Hackathon (SIH) 2026 – Internal Round is organized under the aegis of the "
+                    "Institution’s Innovation Council (IIC), VBSPU. Students are encouraged to participate actively "
+                    "in this prestigious national-level innovation and problem-solving platform to develop innovative technological solutions.\n\n"
+                    "🔥 IMPORTANT DATES:\n"
+                    "• Problem Statements Released: 21 August 2026\n"
+                    "• PPT Submission Deadline: 12 September 2026\n"
+                    "• Final Hackathon: 15 September 2026\n\n"
+                    "👥 PARTICIPATION GUIDELINES:\n"
+                    "• Team Size: 6 Members\n"
+                    "• Mandatory: At least 1 female member is mandatory in each team\n"
+                    "• Students of Faculty of Engineering and Technology (UNSIET) are especially encouraged to participate.\n\n"
+                    "🚀 REGISTRATION & CONTACT:\n"
+                    "• Registration Link: https://forms.gle/YLZTDtHaQTDESos7\n"
+                    "• Registration/Enquiry: usatym2508@gmail.com\n\n"
+                    "COORDINATOR:\n"
+                    "Dr. Satyam Kumar Upadhyay (SPOC-SIH-2026 & Coordinator)\n\n"
+                    "IIC PRESIDENT:\n"
+                    "Prof. Rajnish Bhasker (IIC President, VBSPU)"
+                ),
+                'event_date': date(2026, 9, 15),
+                'event_time': '09:00:00',
+                'location': 'Faculty of Engineering and Technology (UNSIET), VBS Purvanchal University, Jaunpur',
+                'hostel': None,
+                'organizer': 'Institution’s Innovation Council (IIC), UNSIET, VBSPU',
+                'banner_image': 'events/sih-2026-notice.jpg',
+                'created_by': admin_user,
+                'is_active': True
+            }
+        )
+
+        Event.objects.get_or_create(
             title='Inter-Hostel Badminton & Table Tennis Tournament',
             defaults={
                 'description': 'Join the intra-hostel sports showdown! Bring your racquets, represent your floor, and win medals + exciting prizes.',

@@ -13,7 +13,7 @@ class Hostel(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            self.code = self.name.replace(" ", "-").upper()
+            self.code = self.name.replace(" ", "-").upper()[:20]
         super().save(*args, **kwargs)
 
     def __str__(self):

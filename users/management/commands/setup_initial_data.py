@@ -37,12 +37,21 @@ class Command(BaseCommand):
             {'name': 'KALPANA CHAWLA HOSTEL', 'code': 'KC-HOSTEL', 'gender': 'girls'},
             {'name': 'SAROJINI NAIDU HOSTEL', 'code': 'SN-HOSTEL', 'gender': 'girls'},
             {'name': 'TAGORE HOSTEL', 'code': 'TG-HOSTEL', 'gender': 'coed'},
+            {'name': 'Meerabai Hostel', 'code': 'MEERABAI-HOSTEL', 'gender': 'girls', 'description': 'Girls hostel for students.'},
+            {'name': 'Lakshmibai Hostel', 'code': 'LAKSHMIBAI-HOSTEL', 'gender': 'girls', 'description': 'Girls hostel for students.'},
+            {'name': 'Draupadi Hostel', 'code': 'DRAUPADI-HOSTEL', 'gender': 'girls', 'description': 'Girls hostel for students.'},
+            {'name': 'Srinivas Ramanujan PG Hostel', 'code': 'SRPG-HOSTEL', 'gender': 'boys', 'description': 'Boys hostel for students.'},
         ]
 
         for h in default_hostels:
             hostel, created = Hostel.objects.get_or_create(
                 name=h['name'],
-                defaults={'code': h['code'], 'gender': h['gender'], 'is_active': True}
+                defaults={
+                    'code': h['code'],
+                    'gender': h['gender'],
+                    'description': h.get('description', ''),
+                    'is_active': True
+                }
             )
             if created:
                 self.stdout.write(self.style.SUCCESS(f"Hostel '{hostel.name}' created."))

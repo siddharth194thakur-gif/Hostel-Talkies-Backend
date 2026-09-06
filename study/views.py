@@ -1,18 +1,26 @@
 import re
+from django.core.cache import cache
+from django.db.models import Q, F
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from django.db.models import Q, F, Count
-from .models import StudyResource
+from .models import StudyResource, STUDY_META_CACHE_KEY, invalidate_study_meta_cache
 from .serializers import StudyResourceSerializer, StudyResourceAdminSerializer
 from users.permissions import IsChiefAdminOrReadOnly
+
+
+class StudyResourcePagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
 
 
 class StudyResourceViewSet(viewsets.ModelViewSet):
     """
     /api/study/  —  Study Resources API
 
-    Publicly readable (GET).  Write operations require admin.
+    Publicly readable (GET). Write operations require admin.
 
     Filtering query params
     ──────────────────────
@@ -26,10 +34,13 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
       needs_review= true|1  — admin use: only flagged records
     """
     permission_classes = [IsChiefAdminOrReadOnly]
+    pagination_class = StudyResourcePagination
 
     def get_queryset(self):
-        qs = StudyResource.objects.filter(is_active=True, is_pending_review=False)
-        p  = self.request.query_params
+        qs = StudyResource.objects.filter(
+            is_active=True, is_pending_review=False
+        ).select_related('uploader', 'uploader__profile')
+        p = self.request.query_params
 
         resource_type = p.get('type')
         if resource_type:
@@ -87,7 +98,16 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
         return StudyResourceSerializer
 
     def perform_create(self, serializer):
-        serializer.save(uploader=self.request.user)
+        serializer.save(uploader=self.request.user, is_active=True)
+        invalidate_study_meta_cache()
+
+    def perform_update(self, serializer):
+        serializer.save()
+        invalidate_study_meta_cache()
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        invalidate_study_meta_cache()
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def track_download(self, request, pk=None):
@@ -115,50 +135,49 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
             }
           }
 
-        Flat lists (semesters, departments, resource_types, units) are preserved
-        for backward compatibility with any existing callers.
+        All extracted in a single fast query and cached in memory (1 hour TTL).
         """
+        cached_data = cache.get(STUDY_META_CACHE_KEY)
+        if cached_data is not None:
+            return Response(cached_data)
+
         qs = StudyResource.objects.filter(is_active=True, is_pending_review=False)
+        rows = list(qs.values('semester', 'department', 'course_name', 'resource_type', 'unit', 'year', 'exam_session'))
 
-        # ── Flat lists (backward compat) ─────────────────────────────────────
-        semesters = sorted(set(
-            qs.exclude(semester='').values_list('semester', flat=True).distinct()
-        ))
-        departments = sorted(set(
-            qs.exclude(department='').values_list('department', flat=True).distinct()
-        ))
-        type_map = dict(StudyResource.RESOURCE_TYPE_CHOICES)
-        raw_types = list(
-            qs.values_list('resource_type', flat=True).distinct().order_by('resource_type')
-        )
-        resource_types_labeled = [
-            {'value': v, 'label': type_map.get(v, v)} for v in raw_types
-        ]
-        units = sorted(set(
-            qs.exclude(unit='').values_list('unit', flat=True).distinct()
-        ))
-        years = sorted(
-            set(qs.exclude(year='').values_list('year', flat=True).distinct()),
-            key=lambda y: int(re.sub(r'\D', '', y)[:4]) if re.search(r'\d', y) else 0,
-            reverse=True
-        )
+        semesters_set = set()
+        departments_set = set()
+        raw_types_set = set()
+        units_set = set()
+        years_set = set()
+        type_counts = {}
 
-        # ── Hierarchy trees ──────────────────────────────────────────────────
-        # Build: semester → department → course_name → {types, units, years}
-        # One DB round-trip via values().
-        rows = qs.values('semester', 'department', 'course_name', 'resource_type', 'unit', 'year', 'exam_session')
+        hierarchy = {}
+        pyqs_hierarchy = {}
 
-        hierarchy: dict = {}
-        pyqs_hierarchy: dict = {}
+        def year_sort_key(y_str):
+            nums = re.findall(r'\d{4}', str(y_str))
+            return int(nums[0]) if nums else 0
 
         for row in rows:
-            sem   = row['semester']      or ''
-            dept  = row['department']    or ''
-            subj  = row['course_name']   or ''
-            rtype = row['resource_type'] or ''
-            unit  = row['unit']          or ''
-            yr    = row['year']          or ''
-            sess  = row['exam_session']  or ''
+            sem   = (row['semester'] or '').strip()
+            dept  = (row['department'] or '').strip()
+            subj  = (row['course_name'] or '').strip()
+            rtype = (row['resource_type'] or '').strip()
+            unit  = (row['unit'] or '').strip()
+            yr    = (row['year'] or '').strip()
+            sess  = (row['exam_session'] or '').strip()
+
+            if sem:
+                semesters_set.add(sem)
+            if dept:
+                departments_set.add(dept)
+            if rtype:
+                raw_types_set.add(rtype)
+                type_counts[rtype] = type_counts.get(rtype, 0) + 1
+            if unit:
+                units_set.add(unit)
+            if yr:
+                years_set.add(yr)
 
             if not sem or not dept or not subj:
                 continue
@@ -186,10 +205,6 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
                     pyq_subj_node['sessions'].append(sess)
 
         # Sort within each subject node (years: Newest → Oldest)
-        def year_sort_key(y_str):
-            nums = re.findall(r'\d{4}', y_str)
-            return int(nums[0]) if nums else 0
-
         for sem_val in hierarchy.values():
             for dept_val in sem_val.values():
                 for subj_val in dept_val.values():
@@ -203,19 +218,24 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
                     subj_val['years'].sort(key=year_sort_key, reverse=True)
                     subj_val['sessions'].sort()
 
-        type_counts = dict(
-            qs.values('resource_type').annotate(cnt=Count('id')).values_list('resource_type', 'cnt')
-        )
+        type_map = dict(StudyResource.RESOURCE_TYPE_CHOICES)
+        resource_types_labeled = [
+            {'value': v, 'label': type_map.get(v, v)} for v in sorted(raw_types_set)
+        ]
 
-        return Response({
-            'semesters':      semesters,
-            'departments':    departments,
+        data = {
+            'semesters':      sorted(semesters_set),
+            'departments':    sorted(departments_set),
             'resource_types': resource_types_labeled,
             'type_counts':    type_counts,
-            'total_count':    qs.count(),
-            'units':          units,
-            'years':          years,
+            'total_count':    len(rows),
+            'units':          sorted(units_set),
+            'years':          sorted(years_set, key=year_sort_key, reverse=True),
             'hierarchy':      hierarchy,
             'pyqs_hierarchy': pyqs_hierarchy,
-        })
+        }
+
+        cache.set(STUDY_META_CACHE_KEY, data, timeout=3600)
+        return Response(data)
+
 

@@ -223,3 +223,64 @@ class StudyResourcePermissionAPITests(APITestCase):
         self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
         self.assertFalse(StudyResource.objects.filter(title='Anonymous Upload').exists())
 
+    def test_7_meta_endpoint_and_caching(self):
+        from django.core.cache import cache
+        from study.models import STUDY_META_CACHE_KEY
+        cache.delete(STUDY_META_CACHE_KEY)
+
+        # First request: cache miss (1 query)
+        resp1 = self.client.get('/api/study/meta/')
+        self.assertEqual(resp1.status_code, status.HTTP_200_OK)
+        self.assertIn('hierarchy', resp1.data)
+        self.assertIn('pyqs_hierarchy', resp1.data)
+        self.assertEqual(resp1.data['total_count'], 1)
+
+        # Second request: cache hit (0 queries)
+        resp2 = self.client.get('/api/study/meta/')
+        self.assertEqual(resp2.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp2.data['total_count'], 1)
+
+        # Create new resource as admin -> verify cache invalidation
+        self.client.force_authenticate(user=self.chief_admin)
+        post_resp = self.client.post('/api/study/', {
+            'title': 'New Test Resource',
+            'course_name': 'Automata',
+            'resource_type': 'notes',
+            'department': 'CSE',
+            'semester': 'Sem 5',
+        })
+        self.assertEqual(post_resp.status_code, status.HTTP_201_CREATED)
+
+        # Next meta request should have updated count (2)
+        resp3 = self.client.get('/api/study/meta/')
+        self.assertEqual(resp3.data['total_count'], 2)
+
+    def test_8_list_no_n_plus_one_queries_and_pagination(self):
+        # Create multiple resources with different users
+        user2 = User.objects.create_user(username='user2', email='u2@test.com', password='Password@123')
+        for i in range(10):
+            StudyResource.objects.create(
+                title=f'Resource {i}',
+                course_name='Algorithms',
+                resource_type='pyq',
+                semester='Sem 3',
+                department='CSE',
+                year='2024',
+                uploader=self.chief_admin if i % 2 == 0 else user2,
+                is_active=True
+            )
+
+        self.client.force_authenticate(user=self.student)
+
+        # Test page_size parameter
+        resp = self.client.get('/api/study/?page_size=5')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data['results']), 5)
+
+        # Test serializer uploader_detail structure
+        item = resp.data['results'][0]
+        self.assertIn('uploader_detail', item)
+        self.assertIn('full_name', item['uploader_detail'])
+        self.assertIn('role', item['uploader_detail'])
+
+

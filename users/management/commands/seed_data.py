@@ -85,6 +85,54 @@ class Command(BaseCommand):
                     {'name': 'Block C1', 'floors': 5, 'rooms': ['101', '201', '301', '401', '501']},
                 ]
             },
+            {
+                'name': 'Meerabai Hostel',
+                'code': 'MEERABAI-HOSTEL',
+                'description': 'Girls hostel for students.',
+                'gender': 'girls',
+                'warden_name': 'Dr. Sunita Devi',
+                'warden_contact': 'warden.meerabai@campus.edu',
+                'blocks': [
+                    {'name': 'Block A', 'floors': 3, 'rooms': ['101', '102', '201', '202']},
+                    {'name': 'Block B', 'floors': 3, 'rooms': ['103', '104', '203', '204']},
+                ]
+            },
+            {
+                'name': 'Lakshmibai Hostel',
+                'code': 'LAKSHMIBAI-HOSTEL',
+                'description': 'Girls hostel for students.',
+                'gender': 'girls',
+                'warden_name': 'Prof. Anita Singh',
+                'warden_contact': 'warden.lakshmibai@campus.edu',
+                'blocks': [
+                    {'name': 'Block A', 'floors': 3, 'rooms': ['101', '102', '201', '202']},
+                    {'name': 'Block B', 'floors': 3, 'rooms': ['103', '104', '203', '204']},
+                ]
+            },
+            {
+                'name': 'Draupadi Hostel',
+                'code': 'DRAUPADI-HOSTEL',
+                'description': 'Girls hostel for students.',
+                'gender': 'girls',
+                'warden_name': 'Dr. Rekha Mishra',
+                'warden_contact': 'warden.draupadi@campus.edu',
+                'blocks': [
+                    {'name': 'Block A', 'floors': 3, 'rooms': ['101', '102', '201', '202']},
+                    {'name': 'Block B', 'floors': 3, 'rooms': ['103', '104', '203', '204']},
+                ]
+            },
+            {
+                'name': 'Srinivas Ramanujan PG Hostel',
+                'code': 'SRPG-HOSTEL',
+                'description': 'Boys hostel for students.',
+                'gender': 'boys',
+                'warden_name': 'Prof. Rajesh Gupta',
+                'warden_contact': 'warden.ramanujan@campus.edu',
+                'blocks': [
+                    {'name': 'Block A', 'floors': 4, 'rooms': ['101', '102', '201', '202', '301']},
+                    {'name': 'Block B', 'floors': 4, 'rooms': ['103', '104', '203', '204', '302']},
+                ]
+            },
         ]
 
         created_hostels = {}

@@ -68,7 +68,29 @@ class StudyResource(models.Model):
             models.Index(fields=['semester', 'department', 'course_name']),
             models.Index(fields=['resource_type']),
             models.Index(fields=['is_active', 'needs_review']),
+            models.Index(fields=['is_active', 'is_pending_review', 'resource_type']),
+            models.Index(fields=['is_active', 'is_pending_review', 'course_name']),
         ]
 
     def __str__(self):
         return f"[{self.get_resource_type_display()}] {self.title} ({self.course_name})"
+
+
+# ── Cache Invalidation Signals ───────────────────────────────────────────────
+STUDY_META_CACHE_KEY = 'study_meta_data'
+
+
+def invalidate_study_meta_cache():
+    from django.core.cache import cache
+    cache.delete(STUDY_META_CACHE_KEY)
+
+
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=StudyResource)
+@receiver(post_delete, sender=StudyResource)
+def on_study_resource_change(sender, **kwargs):
+    invalidate_study_meta_cache()
+

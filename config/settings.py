@@ -25,7 +25,7 @@ if allowed_hosts_env:
 elif DEBUG:
     ALLOWED_HOSTS = ['*']
 else:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '.onrender.com']
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '.onrender.com', '.hosteltalkies.fun', 'hosteltalkies.fun', 'www.hosteltalkies.fun']
 
 # Automatically include Render external hostname if provided
 render_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
@@ -247,25 +247,29 @@ SIMPLE_JWT = {
 }
 
 # CORS & CSRF Settings
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://hostel-talkies.vercel.app',
+    'https://hostel-talkies-frontend.vercel.app',
+    'https://www.hosteltalkies.fun',
+    'https://hosteltalkies.fun',
+]
+extra_cors = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+if extra_cors:
+    CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in extra_cors.split(',') if origin.strip()])
+
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'https://hostel-talkies.vercel.app',
-        'https://hostel-talkies-frontend.vercel.app',
-    ]
-    extra_cors = os.environ.get('CORS_ALLOWED_ORIGINS', '')
-    if extra_cors:
-        CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in extra_cors.split(',') if origin.strip()])
 
-# Allow all Vercel deployment preview subdomains automatically
+# Allow all Vercel deployment preview subdomains and custom domain variants automatically
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",
+    r"^https://(.*?\.)?hosteltalkies\.fun$",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -277,6 +281,9 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.vercel.app',
     'https://*.netlify.app',
     'https://*.railway.app',
+    'https://www.hosteltalkies.fun',
+    'https://hosteltalkies.fun',
+    'https://*.hosteltalkies.fun',
 ]
 extra_csrf = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 if extra_csrf:

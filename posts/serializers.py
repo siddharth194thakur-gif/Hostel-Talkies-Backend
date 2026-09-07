@@ -1,8 +1,18 @@
+import re
 from rest_framework import serializers
 from django.utils.text import slugify
+from django.utils.html import strip_tags
 from .models import Category, Post, PostImage, Like, Comment, SavedPost, BorrowRequest
 from users.serializers import UserPublicSerializer
 from hostels.serializers import HostelSerializer, BlockSerializer
+
+def sanitize_text(text):
+    if not text or not isinstance(text, str):
+        return text
+    # Strip script and style blocks with their contents completely
+    cleaned = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    # Strip remaining HTML tags
+    return strip_tags(cleaned).strip()
 
 class CategorySerializer(serializers.ModelSerializer):
     posts_count = serializers.IntegerField(source='posts.count', read_only=True)
@@ -40,6 +50,9 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'borrower', 'created_at', 'updated_at']
 
 
+MARKETPLACE_POST_TYPES = {'buy_sell', 'giveaway', 'exchange', 'borrow', 'lend'}
+
+
 class PostListSerializer(serializers.ModelSerializer):
     author_detail = UserPublicSerializer(source='author', read_only=True)
     category_name = serializers.ReadOnlyField(source='category.name')
@@ -47,7 +60,7 @@ class PostListSerializer(serializers.ModelSerializer):
     block_name = serializers.ReadOnlyField(source='block.name')
     images = PostImageSerializer(many=True, read_only=True)
     likes_count = serializers.IntegerField(source='likes.count', read_only=True)
-    comments_count = serializers.IntegerField(source='comments.count', read_only=True)
+    comments_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
     is_saved = serializers.SerializerMethodField()
 
@@ -60,6 +73,11 @@ class PostListSerializer(serializers.ModelSerializer):
             'images', 'likes_count', 'comments_count', 'is_liked', 'is_saved',
             'views_count', 'created_at'
         ]
+
+    def get_comments_count(self, obj):
+        if obj.post_type in MARKETPLACE_POST_TYPES:
+            return 0
+        return obj.comments.filter(is_hidden=False).count()
 
     def get_is_liked(self, obj):
         user = self.context.get('request').user if self.context.get('request') else None
@@ -83,7 +101,7 @@ class PostDetailSerializer(serializers.ModelSerializer):
     comments = serializers.SerializerMethodField()
     borrow_requests = serializers.SerializerMethodField()
     likes_count = serializers.IntegerField(source='likes.count', read_only=True)
-    comments_count = serializers.IntegerField(source='comments.count', read_only=True)
+    comments_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
     is_saved = serializers.SerializerMethodField()
 
@@ -98,8 +116,16 @@ class PostDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_comments(self, obj):
+        # Public comments are completely disabled for marketplace listings
+        if obj.post_type in MARKETPLACE_POST_TYPES:
+            return []
         comments = obj.comments.filter(is_hidden=False).order_by('created_at')
         return CommentSerializer(comments, many=True, context=self.context).data
+
+    def get_comments_count(self, obj):
+        if obj.post_type in MARKETPLACE_POST_TYPES:
+            return 0
+        return obj.comments.filter(is_hidden=False).count()
 
     def get_borrow_requests(self, obj):
         request = self.context.get('request')
@@ -144,23 +170,60 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
             'uploaded_images'
         ]
 
+    def validate(self, attrs):
+        post_type = attrs.get('post_type') or (self.instance.post_type if self.instance else 'general')
+        uploaded_images = attrs.get('uploaded_images', [])
+        custom_category = attrs.get('custom_category', '').strip()
+        category = attrs.get('category') or (self.instance.category if self.instance else None)
+        title = attrs.get('title')
+        description = attrs.get('description')
+        location = attrs.get('location')
+
+        # 1. Custom category is completely disallowed for students
+        if custom_category:
+            raise serializers.ValidationError({
+                'custom_category': 'Custom categories are disabled. Please choose an approved category from the list.'
+            })
+
+        # 2. Marketplace listings safety enforcement
+        if post_type in MARKETPLACE_POST_TYPES:
+            # Require approved category
+            if not category:
+                raise serializers.ValidationError({
+                    'category': 'Category is required for marketplace listings. Please select an approved category.'
+                })
+            # Disallow public photos
+            if uploaded_images:
+                raise serializers.ValidationError({
+                    'uploaded_images': 'Public photo/media uploads are disabled for marketplace listings to ensure campus safety.'
+                })
+
+        # 3. Category active check
+        if category and not category.is_active:
+            raise serializers.ValidationError({
+                'category': 'The selected category is currently inactive. Please choose an active category.'
+            })
+
+        # 4. Description length limit (max 1000 chars)
+        if description and len(description) > 1000:
+            raise serializers.ValidationError({
+                'description': f'Description cannot exceed 1000 characters (currently {len(description)}).'
+            })
+
+        # 5. Sanitize text fields against HTML/script injection
+        if title:
+            attrs['title'] = sanitize_text(title)
+        if description:
+            attrs['description'] = sanitize_text(description)
+        if location:
+            attrs['location'] = sanitize_text(location)
+
+        return attrs
+
     def create(self, validated_data):
         images_data = validated_data.pop('uploaded_images', [])
-        custom_category_name = validated_data.pop('custom_category', '').strip()
+        validated_data.pop('custom_category', None)
         user = self.context['request'].user
-        
-        # If custom category name provided, resolve or create Category
-        if custom_category_name:
-            category, _ = Category.objects.get_or_create(
-                name__iexact=custom_category_name,
-                defaults={
-                    'name': custom_category_name,
-                    'slug': slugify(custom_category_name),
-                    'icon': 'tag',
-                    'post_type': 'all',
-                }
-            )
-            validated_data['category'] = category
 
         # Set hostel and block from user profile if not explicitly set
         profile = getattr(user, 'profile', None)
@@ -181,19 +244,7 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         images_data = validated_data.pop('uploaded_images', [])
-        custom_category_name = validated_data.pop('custom_category', '').strip()
-
-        if custom_category_name:
-            category, _ = Category.objects.get_or_create(
-                name__iexact=custom_category_name,
-                defaults={
-                    'name': custom_category_name,
-                    'slug': slugify(custom_category_name),
-                    'icon': 'tag',
-                    'post_type': 'all',
-                }
-            )
-            validated_data['category'] = category
+        validated_data.pop('custom_category', None)
 
         for attr, val in validated_data.items():
             setattr(instance, attr, val)

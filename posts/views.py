@@ -154,6 +154,12 @@ class PostViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated, IsNotBlockedOrSuspended])
     def add_comment(self, request, pk=None):
         post = self.get_object()
+        if post.post_type in ['buy_sell', 'giveaway', 'exchange', 'borrow', 'lend']:
+            return Response(
+                {'detail': "Public comments are disabled for marketplace listings. Please use the 'I'm Interested' button to chat privately with the seller."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         content = request.data.get('content', '').strip()
         if not content:
             return Response({'detail': 'Comment content cannot be empty.'}, status=status.HTTP_400_BAD_REQUEST)

@@ -21,6 +21,17 @@ class CategoryAdmin(admin.ModelAdmin):
     list_filter = ('post_type', 'is_active')
     search_fields = ('name', 'slug')
     prepopulated_fields = {'slug': ('name',)}
+    actions = ['activate_categories', 'deactivate_categories']
+
+    def activate_categories(self, request, queryset):
+        count = queryset.update(is_active=True)
+        self.message_user(request, f"Successfully activated {count} category/categories.")
+    activate_categories.short_description = "Activate selected categories"
+
+    def deactivate_categories(self, request, queryset):
+        count = queryset.update(is_active=False)
+        self.message_user(request, f"Successfully deactivated {count} category/categories.")
+    deactivate_categories.short_description = "Deactivate selected categories"
 
     def get_posts_count(self, obj):
         count = obj.posts.filter(is_deleted=False).count()

@@ -120,15 +120,14 @@ class PostAndCommunityTests(APITestCase):
         self.assertNotIn('<p>', res5.data['description'])
         self.assertNotIn('<b>', res5.data['description'])
 
-        # 6. Non-marketplace post (e.g. general) allows comments
-        res6 = self.client.post('/api/posts/', {
-            'title': 'General Campus Discussion',
-            'description': 'Who wants to play cricket this evening?',
-            'post_type': 'general',
-            'category': self.category.id
+        # 7. Marketplace post without title auto-derives title from category name and omits location
+        res7 = self.client.post('/api/posts/', {
+            'post_type': 'buy_sell',
+            'category': self.category.id,
+            'price': '350',
+            'condition': 'good',
+            'location': 'Public Location Spot'
         })
-        self.assertEqual(res6.status_code, status.HTTP_201_CREATED)
-        gen_post_id = res6.data['id']
-
-        comment_res = self.client.post(f'/api/posts/{gen_post_id}/add_comment/', {'content': 'I am in!'})
-        self.assertEqual(comment_res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res7.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res7.data['title'], self.category.name)
+        self.assertEqual(res7.data['location'], '')

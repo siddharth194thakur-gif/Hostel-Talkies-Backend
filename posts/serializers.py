@@ -150,6 +150,8 @@ class PostDetailSerializer(serializers.ModelSerializer):
 
 
 class PostCreateUpdateSerializer(serializers.ModelSerializer):
+    title = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    description = serializers.CharField(required=False, allow_blank=True, default='')
     uploaded_images = serializers.ListField(
         child=serializers.ImageField(allow_empty_file=False, use_url=False),
         write_only=True,
@@ -175,9 +177,9 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
         uploaded_images = attrs.get('uploaded_images', [])
         custom_category = attrs.get('custom_category', '').strip()
         category = attrs.get('category') or (self.instance.category if self.instance else None)
-        title = attrs.get('title')
-        description = attrs.get('description')
-        location = attrs.get('location')
+        title = attrs.get('title', '').strip()
+        description = attrs.get('description', '').strip()
+        location = attrs.get('location', '').strip()
 
         # 1. Custom category is completely disallowed for students
         if custom_category:
@@ -197,6 +199,17 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'uploaded_images': 'Public photo/media uploads are disabled for marketplace listings to ensure campus safety.'
                 })
+            # Auto-assign title from category name if not provided
+            if not title:
+                title = category.name
+                attrs['title'] = title
+            # Location is omitted for marketplace listings to ensure private handover
+            attrs['location'] = ''
+        else:
+            if not title:
+                raise serializers.ValidationError({
+                    'title': 'Post title is required.'
+                })
 
         # 3. Category active check
         if category and not category.is_active:
@@ -215,8 +228,8 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
             attrs['title'] = sanitize_text(title)
         if description:
             attrs['description'] = sanitize_text(description)
-        if location:
-            attrs['location'] = sanitize_text(location)
+        if attrs.get('location'):
+            attrs['location'] = sanitize_text(attrs['location'])
 
         return attrs
 

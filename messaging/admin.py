@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Conversation, Message, MessageReaction
+from .models import Conversation, Message, MessageReaction, UserChatPreference
 
 class MessageInline(admin.TabularInline):
     model = Message
@@ -46,3 +46,10 @@ class MessageReactionAdmin(admin.ModelAdmin):
     list_display = ('id', 'message', 'user', 'reaction', 'created_at')
     list_filter = ('reaction', 'created_at')
     search_fields = ('user__email', 'reaction')
+
+
+@admin.register(UserChatPreference)
+class UserChatPreferenceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'conversation', 'bg_type', 'bubble_style', 'theme_mode', 'updated_at')
+    list_filter = ('bg_type', 'bubble_style', 'theme_mode')
+    search_fields = ('user__email', 'user__username')

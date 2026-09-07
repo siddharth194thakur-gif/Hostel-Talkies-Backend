@@ -9,6 +9,8 @@ from services.models import HostelService
 from notifications.models import Notification
 from moderation.models import Report, AdminActionLog, Feedback, SiteSetting
 from users.models import StudentProfile
+from gaming.models import Competition, CompetitionParticipant, CompetitionResult
+from messaging.models import Conversation, Message
 from django.utils import timezone
 from django.db.models import Count, Q, Sum
 
@@ -107,6 +109,15 @@ def get_dashboard_stats():
     dismissed_reports = reports_qs.filter(status='dismissed').count()
     pending_feedback = Feedback.objects.filter(status='pending').count()
 
+    # Gaming & Competitions
+    competitions_qs = Competition.objects.all()
+    total_competitions = competitions_qs.count()
+    active_competitions = competitions_qs.filter(is_active=True).count()
+    live_competitions = competitions_qs.filter(status='live').count()
+    open_reg_competitions = competitions_qs.filter(status='registration_open', is_registration_closed_by_organizer=False).count()
+    total_participants = CompetitionParticipant.objects.count()
+    pending_results_count = CompetitionResult.objects.filter(verification_status='pending').count()
+
     # Dynamic Hostel Overview List (Optimized batch queries)
     room_stats = {
         item['block__hostel_id']: item
@@ -192,6 +203,13 @@ def get_dashboard_stats():
         'resolved_reports': resolved_reports,
         'dismissed_reports': dismissed_reports,
         'pending_feedback': pending_feedback,
+
+        'total_competitions': total_competitions,
+        'active_competitions': active_competitions,
+        'live_competitions': live_competitions,
+        'open_reg_competitions': open_reg_competitions,
+        'total_participants': total_participants,
+        'pending_results_count': pending_results_count,
 
         # Complex Entities
         'hostels_summary': hostels_summary,
@@ -342,6 +360,45 @@ def get_changelist_kpis(app_label, model_name):
             {'label': 'Total Feedback', 'value': fb_qs.count(), 'color': '#4f46e5', 'sub': 'User Submissions'},
             {'label': 'Pending Feedback', 'value': fb_qs.filter(status='pending').count(), 'color': '#f59e0b', 'sub': 'Unreviewed'},
             {'label': 'Resolved', 'value': fb_qs.filter(status='resolved').count(), 'color': '#10b981', 'sub': 'Addressed'},
+        ]
+    elif app_label == 'gaming' and model_name == 'competition':
+        gm_qs = Competition.objects.all()
+        kpis = [
+            {'label': 'Total Tournaments', 'value': gm_qs.count(), 'color': '#f97316', 'sub': 'Gaming Events'},
+            {'label': 'Live Matches', 'value': gm_qs.filter(status='live').count(), 'color': '#ef4444', 'sub': 'Currently In Play'},
+            {'label': 'Registration Open', 'value': gm_qs.filter(status='registration_open', is_registration_closed_by_organizer=False).count(), 'color': '#10b981', 'sub': 'Accepting Entries'},
+            {'label': 'Total Players', 'value': CompetitionParticipant.objects.count(), 'color': '#6366f1', 'sub': 'Enrolled Gamers'},
+        ]
+    elif app_label == 'gaming' and model_name == 'competitionparticipant':
+        cp_qs = CompetitionParticipant.objects.all()
+        kpis = [
+            {'label': 'Total Participants', 'value': cp_qs.count(), 'color': '#6366f1', 'sub': 'Across All Matches'},
+            {'label': 'Confirmed', 'value': cp_qs.filter(status='confirmed').count(), 'color': '#10b981', 'sub': 'Verified Entry'},
+            {'label': 'Registered', 'value': cp_qs.filter(status='registered').count(), 'color': '#0284c7', 'sub': 'Standard Signups'},
+            {'label': 'Disqualified', 'value': cp_qs.filter(status='disqualified').count(), 'color': '#ef4444', 'sub': 'Rule Violations'},
+        ]
+    elif app_label == 'gaming' and model_name == 'competitionresult':
+        cr_qs = CompetitionResult.objects.all()
+        kpis = [
+            {'label': 'Submitted Results', 'value': cr_qs.count(), 'color': '#f97316', 'sub': 'Match Submissions'},
+            {'label': 'Pending Approval', 'value': cr_qs.filter(verification_status='pending').count(), 'color': '#f59e0b', 'sub': 'Requires Admin Check'},
+            {'label': 'Approved', 'value': cr_qs.filter(verification_status='approved').count(), 'color': '#10b981', 'sub': 'Verified Winners'},
+            {'label': 'Rejected', 'value': cr_qs.filter(verification_status='rejected').count(), 'color': '#ef4444', 'sub': 'Invalid Proof'},
+        ]
+    elif app_label == 'messaging' and model_name == 'conversation':
+        cv_qs = Conversation.objects.all()
+        kpis = [
+            {'label': 'Total Conversations', 'value': cv_qs.count(), 'color': '#4f46e5', 'sub': 'Active Threads'},
+            {'label': 'Group Chats', 'value': cv_qs.filter(is_group=True).count(), 'color': '#0284c7', 'sub': 'Campus Communities'},
+            {'label': 'Direct Chats', 'value': cv_qs.filter(is_group=False).count(), 'color': '#10b981', 'sub': '1-on-1 Chats'},
+            {'label': 'Marketplace Chats', 'value': cv_qs.filter(related_post__isnull=False).count(), 'color': '#7c3aed', 'sub': 'Item Inquiries'},
+        ]
+    elif app_label == 'messaging' and model_name == 'message':
+        ms_qs = Message.objects.all()
+        kpis = [
+            {'label': 'Total Messages', 'value': ms_qs.count(), 'color': '#4f46e5', 'sub': 'Exchanged Messages'},
+            {'label': 'With Files/Media', 'value': ms_qs.filter(file__isnull=False).exclude(file='').count(), 'color': '#0284c7', 'sub': 'Shared Media'},
+            {'label': 'Unread Messages', 'value': ms_qs.filter(is_read=False).count(), 'color': '#f59e0b', 'sub': 'Pending Read'},
         ]
 
     return kpis

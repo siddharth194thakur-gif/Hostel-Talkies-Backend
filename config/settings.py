@@ -13,7 +13,11 @@ load_dotenv(BASE_DIR.parent / '.env')
 # Quick-start development settings - unsuitable for production
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or os.environ.get('SECRET_KEY') or 'django-insecure-hosteltalkies-super-secret-key-2026-xyz-987'
 
-DEBUG = os.environ.get('DJANGO_DEBUG', os.environ.get('DEBUG', 'True')).lower() in ['true', '1', 'yes']
+# In production (e.g. Render / DATABASE_URL present), DEBUG must default to False unless explicitly set.
+# In local development without production flags, DEBUG defaults to True.
+_is_production = bool(os.environ.get('RENDER') or os.environ.get('RENDER_EXTERNAL_HOSTNAME') or os.environ.get('DATABASE_URL'))
+_default_debug = 'False' if _is_production else 'True'
+DEBUG = os.environ.get('DJANGO_DEBUG', os.environ.get('DEBUG', _default_debug)).lower() in ['true', '1', 'yes']
 
 allowed_hosts_env = os.environ.get('DJANGO_ALLOWED_HOSTS', os.environ.get('ALLOWED_HOSTS', ''))
 if allowed_hosts_env:

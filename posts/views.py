@@ -21,7 +21,21 @@ class CategoryViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_active=True)
         post_type = self.request.query_params.get('post_type')
         if post_type:
-            queryset = queryset.filter(Q(post_type=post_type) | Q(post_type='all'))
+            # Map post_type to category post_type association
+            if post_type in ['buy_sell', 'giveaway', 'exchange', 'borrow', 'lend', 'marketplace']:
+                queryset = queryset.filter(post_type='marketplace')
+            elif post_type in ['lost', 'found', 'lost_found']:
+                queryset = queryset.filter(post_type='lost_found')
+            elif post_type == 'roommate':
+                queryset = queryset.filter(post_type='roommate')
+            elif post_type == 'general':
+                queryset = queryset.filter(post_type='general')
+            elif post_type == 'study':
+                queryset = queryset.filter(post_type='study')
+            elif post_type == 'services':
+                queryset = queryset.filter(post_type='services')
+            else:
+                queryset = queryset.filter(post_type=post_type)
         return queryset.order_by('name')
 
 

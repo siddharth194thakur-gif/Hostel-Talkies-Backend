@@ -209,12 +209,12 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'category': 'Category is required for marketplace listings. Please select an approved category.'
                 })
-            # Auto-assign title from category name if not provided
-            if not title:
-                title = category.name
-                attrs['title'] = title
-            # Location is omitted for marketplace listings to ensure private handover
+            # Auto-assign title from category name
+            attrs['title'] = category.name
+            # Location is strictly omitted for marketplace listings
             attrs['location'] = ''
+            # Free-text description is omitted for marketplace listings to keep it clean and structured
+            attrs['description'] = f"Category: {category.name} | Condition: {attrs.get('condition', 'good').replace('_', ' ').capitalize()} | Availability: {attrs.get('status', 'available').capitalize()}"
             if post_type == 'giveaway':
                 attrs['price'] = 0.00
             elif post_type == 'buy_sell':
@@ -225,17 +225,18 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
         elif post_type == 'roommate':
             attrs['price'] = None
             attrs['condition'] = 'na'
+            attrs['location'] = ''
             if not title:
-                title = 'Roommate & Accommodation Requirement'
-                attrs['title'] = title
+                attrs['title'] = 'Roommate & Accommodation Requirement'
 
         elif post_type in ('lost', 'found'):
             attrs['price'] = None
             attrs['condition'] = 'na'
             if not title:
-                raise serializers.ValidationError({
-                    'title': f"Item name/title is required for {post_type.replace('_', ' ')} items."
-                })
+                if category:
+                    attrs['title'] = f"{post_type.capitalize()} Item - {category.name}"
+                else:
+                    attrs['title'] = f"{post_type.capitalize()} Item Report"
 
         elif post_type == 'general':
             attrs['price'] = None
@@ -254,11 +255,29 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
                     'title': 'Post title is required.'
                 })
 
-        # 5. Category active check
-        if category and not category.is_active:
-            raise serializers.ValidationError({
-                'category': 'The selected category is currently inactive. Please choose an active category.'
-            })
+        # 5. Category validation: active and matches section post_type
+        if category:
+            if not category.is_active:
+                raise serializers.ValidationError({
+                    'category': 'The selected category is currently inactive. Please choose an active category.'
+                })
+            # Enforce strict post_type <-> category matching (no cross-category mixing)
+            if post_type in MARKETPLACE_POST_TYPES and category.post_type != 'marketplace':
+                raise serializers.ValidationError({
+                    'category': f'The category "{category.name}" does not belong to Buy & Sell / Marketplace.'
+                })
+            elif post_type in ['lost', 'found'] and category.post_type != 'lost_found':
+                raise serializers.ValidationError({
+                    'category': f'The category "{category.name}" does not belong to Lost & Found.'
+                })
+            elif post_type == 'roommate' and category.post_type != 'roommate':
+                raise serializers.ValidationError({
+                    'category': f'The category "{category.name}" does not belong to Roommate & Accommodation.'
+                })
+            elif post_type == 'general' and category.post_type != 'general':
+                raise serializers.ValidationError({
+                    'category': f'The category "{category.name}" does not belong to General Talkies.'
+                })
 
         # 6. Description length limit (max 1000 chars default)
         if description and len(description) > 1000:

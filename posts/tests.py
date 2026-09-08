@@ -17,7 +17,7 @@ class PostAndCommunityTests(APITestCase):
         self.user2 = User.objects.create_user(username='student2', email='student2@hostel.edu', password='PassWord@123')
         StudentProfile.objects.create(user=self.user2, hostel=self.hostel)
 
-        self.category = Category.objects.create(name='Electronics', icon='laptop')
+        self.category = Category.objects.create(name='Electronics', icon='laptop', post_type='marketplace')
 
     def test_post_creation_and_ownership(self):
         login_res = self.client.post(reverse('login'), {'email': 'student1@hostel.edu', 'password': 'PassWord@123'})
@@ -174,4 +174,23 @@ class PostAndCommunityTests(APITestCase):
         self.assertIsNone(res10.data['price'])
         self.assertEqual(res10.data['condition'], 'na')
         self.assertEqual(res10.data['location'], 'Mess 1')
+
+        # 11. Category separation: assigning a Roommate category to Buy & Sell must fail
+        roommate_cat = Category.objects.create(name='Roommate Needs', post_type='roommate')
+        res11 = self.client.post('/api/posts/', {
+            'post_type': 'buy_sell',
+            'category': roommate_cat.id,
+            'price': '100',
+            'condition': 'good'
+        })
+        self.assertEqual(res11.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('category', res11.data)
+        self.assertIn('does not belong to Buy & Sell / Marketplace', str(res11.data['category']))
+
+        # 12. CategoryViewSet: filtering by post_type returns only matching categories
+        cat_res = self.client.get('/api/posts/categories/?post_type=marketplace')
+        self.assertEqual(cat_res.status_code, status.HTTP_200_OK)
+        cat_names = [c['name'] for c in (cat_res.data if isinstance(cat_res.data, list) else cat_res.data['results'])]
+        self.assertIn('Electronics', cat_names)
+        self.assertNotIn('Roommate Needs', cat_names)
 

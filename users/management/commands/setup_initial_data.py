@@ -62,17 +62,17 @@ class Command(BaseCommand):
 
         # Create comprehensive standard categories for campus hostel life
         default_categories = [
-            {'name': 'Electronics & Gadgets', 'icon': 'laptop', 'post_type': 'all'},
-            {'name': 'Books, Notes & PYQs', 'icon': 'book', 'post_type': 'all'},
-            {'name': 'Cycles & Mobility', 'icon': 'bicycle', 'post_type': 'all'},
-            {'name': 'Room Essentials & Decor', 'icon': 'home', 'post_type': 'all'},
-            {'name': 'Study Desks & Furniture', 'icon': 'armchair', 'post_type': 'all'},
-            {'name': 'Lab Gear & Uniforms', 'icon': 'shirt', 'post_type': 'all'},
-            {'name': 'Sports & Fitness Equipment', 'icon': 'dumbbell', 'post_type': 'all'},
-            {'name': 'Mess & Kitchen Appliances', 'icon': 'utensils', 'post_type': 'all'},
-            {'name': 'Lost & Found Items', 'icon': 'search', 'post_type': 'all'},
-            {'name': 'Roommate & Accommodation', 'icon': 'users', 'post_type': 'all'},
-            {'name': 'General Campus Talkies', 'icon': 'sparkles', 'post_type': 'all'},
+            {'name': 'Electronics & Gadgets', 'icon': 'laptop', 'post_type': 'marketplace'},
+            {'name': 'Books, Notes & PYQs', 'icon': 'book', 'post_type': 'marketplace'},
+            {'name': 'Cycles & Mobility', 'icon': 'bicycle', 'post_type': 'marketplace'},
+            {'name': 'Room Essentials & Decor', 'icon': 'home', 'post_type': 'marketplace'},
+            {'name': 'Study Desks & Furniture', 'icon': 'armchair', 'post_type': 'marketplace'},
+            {'name': 'Lab Gear & Uniforms', 'icon': 'shirt', 'post_type': 'marketplace'},
+            {'name': 'Sports & Fitness Equipment', 'icon': 'dumbbell', 'post_type': 'marketplace'},
+            {'name': 'Mess & Kitchen Appliances', 'icon': 'utensils', 'post_type': 'marketplace'},
+            {'name': 'Lost & Found Items', 'icon': 'search', 'post_type': 'lost_found'},
+            {'name': 'Roommate & Accommodation', 'icon': 'users', 'post_type': 'roommate'},
+            {'name': 'General Campus Talkies', 'icon': 'sparkles', 'post_type': 'general'},
         ]
 
         for cat_data in default_categories:
@@ -86,5 +86,8 @@ class Command(BaseCommand):
                     'is_active': True
                 }
             )
+            if not cat_created and category.post_type != cat_data['post_type']:
+                category.post_type = cat_data['post_type']
+                category.save(update_fields=['post_type'])
             if cat_created:
                 self.stdout.write(self.style.SUCCESS(f"Category '{category.name}' created."))

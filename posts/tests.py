@@ -131,3 +131,47 @@ class PostAndCommunityTests(APITestCase):
         self.assertEqual(res7.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res7.data['title'], self.category.name)
         self.assertEqual(res7.data['location'], '')
+
+        # 8. Profanity in title or description is strictly rejected
+        res8 = self.client.post('/api/posts/', {
+            'post_type': 'general',
+            'title': 'You are a f.u.c.k.i.n.g idiot',
+            'description': 'Hello campus',
+        })
+        self.assertEqual(res8.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('title', res8.data)
+
+        res8_hindi = self.client.post('/api/posts/', {
+            'post_type': 'general',
+            'title': 'Clean Title',
+            'description': 'bhenchod room',
+        })
+        self.assertEqual(res8_hindi.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('description', res8_hindi.data)
+
+        # 9. Roommate post neutralizes price and forces condition 'na'
+        res9 = self.client.post('/api/posts/', {
+            'post_type': 'roommate',
+            'description': 'Looking For: Roommate Needed\nAccommodation: Double Sharing\nHostel: Aryabhata',
+            'price': '5000',
+            'condition': 'used',
+        })
+        self.assertEqual(res9.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(res9.data['price'])
+        self.assertEqual(res9.data['condition'], 'na')
+        self.assertIn('Roommate', res9.data['title'])
+
+        # 10. Lost item post neutralizes price and forces condition 'na'
+        res10 = self.client.post('/api/posts/', {
+            'post_type': 'lost',
+            'title': 'Lost Boat Headphones',
+            'description': 'Black color, lost near Mess 1',
+            'location': 'Mess 1',
+            'price': '1500',
+            'condition': 'like_new'
+        })
+        self.assertEqual(res10.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(res10.data['price'])
+        self.assertEqual(res10.data['condition'], 'na')
+        self.assertEqual(res10.data['location'], 'Mess 1')
+

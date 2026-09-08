@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.utils.text import slugify
 from django.utils.html import strip_tags
 from .models import Category, Post, PostImage, Like, Comment, SavedPost, BorrowRequest
+from .profanity import validate_clean_content
 from users.serializers import UserPublicSerializer
 from hostels.serializers import HostelSerializer, BlockSerializer
 
@@ -187,17 +188,26 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
                 'custom_category': 'Custom categories are disabled. Please choose an approved category from the list.'
             })
 
-        # 2. Marketplace listings safety enforcement
+        # 2. Public user media uploads are disabled across all post types to ensure campus safety
+        if uploaded_images:
+            raise serializers.ValidationError({
+                'uploaded_images': 'Public photo and video uploads are disabled on community posts to protect student privacy.'
+            })
+
+        # 3. Profanity filter check on all user-entered text fields
+        if title:
+            validate_clean_content(title, 'title')
+        if description:
+            validate_clean_content(description, 'description')
+        if location:
+            validate_clean_content(location, 'location')
+
+        # 4. Category-specific field rules
         if post_type in MARKETPLACE_POST_TYPES:
             # Require approved category
             if not category:
                 raise serializers.ValidationError({
                     'category': 'Category is required for marketplace listings. Please select an approved category.'
-                })
-            # Disallow public photos
-            if uploaded_images:
-                raise serializers.ValidationError({
-                    'uploaded_images': 'Public photo/media uploads are disabled for marketplace listings to ensure campus safety.'
                 })
             # Auto-assign title from category name if not provided
             if not title:
@@ -205,25 +215,58 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
                 attrs['title'] = title
             # Location is omitted for marketplace listings to ensure private handover
             attrs['location'] = ''
+            if post_type == 'giveaway':
+                attrs['price'] = 0.00
+            elif post_type == 'buy_sell':
+                price = attrs.get('price')
+                if price is None or str(price).strip() == '':
+                    raise serializers.ValidationError({'price': 'Price is required for Buy & Sell listings.'})
+
+        elif post_type == 'roommate':
+            attrs['price'] = None
+            attrs['condition'] = 'na'
+            if not title:
+                title = 'Roommate & Accommodation Requirement'
+                attrs['title'] = title
+
+        elif post_type in ('lost', 'found'):
+            attrs['price'] = None
+            attrs['condition'] = 'na'
+            if not title:
+                raise serializers.ValidationError({
+                    'title': f"Item name/title is required for {post_type.replace('_', ' ')} items."
+                })
+
+        elif post_type == 'general':
+            attrs['price'] = None
+            attrs['condition'] = 'na'
+            if not title:
+                raise serializers.ValidationError({
+                    'title': 'Subject/title is required for General Talkies.'
+                })
+            if description and len(description) > 500:
+                raise serializers.ValidationError({
+                    'description': f'General Talkies message cannot exceed 500 characters (currently {len(description)}).'
+                })
         else:
             if not title:
                 raise serializers.ValidationError({
                     'title': 'Post title is required.'
                 })
 
-        # 3. Category active check
+        # 5. Category active check
         if category and not category.is_active:
             raise serializers.ValidationError({
                 'category': 'The selected category is currently inactive. Please choose an active category.'
             })
 
-        # 4. Description length limit (max 1000 chars)
+        # 6. Description length limit (max 1000 chars default)
         if description and len(description) > 1000:
             raise serializers.ValidationError({
                 'description': f'Description cannot exceed 1000 characters (currently {len(description)}).'
             })
 
-        # 5. Sanitize text fields against HTML/script injection
+        # 7. Sanitize text fields against HTML/script injection
         if title:
             attrs['title'] = sanitize_text(title)
         if description:

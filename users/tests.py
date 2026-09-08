@@ -523,10 +523,18 @@ class UserBlockTests(APITestCase):
         self.assertEqual(resource_data['uploader_detail']['role'], 'Admin')
         self.assertNotEqual(resource_data['uploader_detail']['full_name'], 'Chief Warden')
 
+    def test_lenient_jwt_authentication_allows_public_get_with_expired_token(self):
+        # 1. GET /api/hostels/ with expired/invalid bearer token should succeed with HTTP 200 (not 401)
+        response = self.client.get(
+            '/api/hostels/',
+            HTTP_AUTHORIZATION='Bearer expired_or_corrupt_jwt_token'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-
-
-
-
-
-
+        # 2. POST to protected endpoint with expired/invalid bearer token should still return HTTP 401
+        protected_response = self.client.patch(
+            reverse('profile_update'),
+            {'bio': 'New bio'},
+            HTTP_AUTHORIZATION='Bearer expired_or_corrupt_jwt_token'
+        )
+        self.assertEqual(protected_response.status_code, status.HTTP_401_UNAUTHORIZED)

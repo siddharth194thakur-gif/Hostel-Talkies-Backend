@@ -214,4 +214,14 @@ class AdminUsersListView(generics.ListAPIView):
     permission_classes = [permissions.IsAdminUser]
 
 
+class LogoutView(views.APIView):
+    """
+    Logout endpoint. With ROTATE_REFRESH_TOKENS=True and BLACKLIST_AFTER_ROTATION=False,
+    the backend cannot cryptographically revoke the refresh token.
+    This endpoint exists for API completeness; actual session clearing happens client-side.
+    Returns 200 so frontend always completes logout cleanly.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
+    def post(self, request):
+        return Response({'detail': 'Logged out successfully.'}, status=status.HTTP_200_OK)

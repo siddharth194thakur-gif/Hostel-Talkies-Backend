@@ -37,9 +37,13 @@ class StudyResourceViewSet(viewsets.ModelViewSet):
     pagination_class = StudyResourcePagination
 
     def get_queryset(self):
-        qs = StudyResource.objects.filter(
-            is_active=True, is_pending_review=False
-        ).select_related('uploader', 'uploader__profile')
+        user = self.request.user
+        if user and user.is_authenticated and (user.is_staff or user.is_superuser):
+            qs = StudyResource.objects.all().select_related('uploader', 'uploader__profile')
+        else:
+            qs = StudyResource.objects.filter(
+                is_active=True, is_pending_review=False
+            ).select_related('uploader', 'uploader__profile')
         p = self.request.query_params
 
         resource_type = p.get('type')

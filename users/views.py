@@ -112,7 +112,9 @@ class ProfileUpdateView(generics.RetrieveUpdateAPIView):
 
 class UserDetailView(generics.RetrieveAPIView):
     """Public profile for viewing other students without leaking sensitive info."""
-    queryset = User.objects.filter(is_active=True, is_blocked=False)
+    queryset = User.objects.filter(is_active=True, is_blocked=False).select_related(
+        'profile', 'profile__hostel', 'profile__block', 'profile__room'
+    )
     serializer_class = UserPublicSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -139,8 +141,10 @@ class BlockUserView(views.APIView):
             return Response({'detail': 'You cannot block yourself.'}, status=status.HTTP_400_BAD_REQUEST)
 
         block_rel, created = UserBlock.objects.get_or_create(blocker=request.user, blocked=target_user)
+        target_name = target_user.get_full_name() or target_user.username
+        msg = f'You have blocked {target_name}.' if created else f'{target_name} is already blocked.'
         return Response({
-            'detail': f'You have blocked {target_user.get_full_name() or target_user.username}.',
+            'detail': msg,
             'is_blocked_by_me': True,
         }, status=status.HTTP_200_OK)
 

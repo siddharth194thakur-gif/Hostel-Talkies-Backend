@@ -1,3 +1,5 @@
+import re
+from urllib.parse import unquote
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from .models import StudyResource
@@ -104,8 +106,6 @@ class StudyResourceSerializer(serializers.ModelSerializer):
         ret = super().to_representation(instance)
         title = ret.get('title')
         if title:
-            import re
-            from urllib.parse import unquote
             t = unquote(title)
             t = re.sub(r'[\s\-_(]*[💙~]*[∆\u2206][☮\u262e\ufe0f]+[💙~]*[\s\-_)]*', ' ', t)
             t = re.sub(r'[\s~]{2,}', ' ', t)

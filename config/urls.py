@@ -102,7 +102,17 @@ class GlobalSearchView(views.APIView):
                 'profile', 'profile__hostel', 'profile__block', 'profile__room'
             )[:15]
 
-            people_data = UserPublicSerializer(users_qs, many=True, context={'request': request}).data
+            user_obj = getattr(request, 'user', None)
+            blocked_user_ids = set()
+            if user_obj and getattr(user_obj, 'is_authenticated', False):
+                from users.models import UserBlock
+                blocked_user_ids = set(UserBlock.objects.filter(blocker=user_obj).values_list('blocked_id', flat=True))
+
+            people_data = UserPublicSerializer(
+                users_qs,
+                many=True,
+                context={'request': request, 'blocked_user_ids': blocked_user_ids}
+            ).data
         except Exception as e:
             logger.error("Error in GlobalSearchView (people): %s", e)
             people_data = []
@@ -324,7 +334,7 @@ class GlobalSearchView(views.APIView):
             'services': services_data,
             'study_resources': study_data,
             'competitions': comp_list,
-            'rooms': comp_list,
+            'rooms': [],
             'count': total_count
         })
 
@@ -382,7 +392,6 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     path('api/moderation/', include('moderation.urls')),
     path('api/search/', GlobalSearchView.as_view(), name='global-search'),
-    re_path(r'^api/search/?$', GlobalSearchView.as_view(), name='global-search-slash'),
     path('api/admin-stats/', AdminStatsView.as_view(), name='admin-stats'),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]

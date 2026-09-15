@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from .models import StudentProfile, UserBlock
@@ -78,6 +79,9 @@ class UserPublicSerializer(serializers.ModelSerializer):
         ]
 
     def get_is_blocked_by_me(self, obj):
+        blocked_user_ids = self.context.get('blocked_user_ids')
+        if blocked_user_ids is not None:
+            return obj.id in blocked_user_ids
         request = self.context.get('request')
         user = getattr(request, 'user', None)
         if user and getattr(user, 'is_authenticated', False):
@@ -159,7 +163,10 @@ class RegisterSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs['password'] != attrs['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
-        validate_password(attrs['password'])
+        try:
+            validate_password(attrs['password'])
+        except DjangoValidationError as err:
+            raise serializers.ValidationError({"password": list(err.messages)})
 
         hostel = attrs.get('hostel')
         block = attrs.get('block')
@@ -235,11 +242,15 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})
+        user_fields_to_update = []
         if 'first_name' in user_data:
             instance.user.first_name = user_data['first_name']
+            user_fields_to_update.append('first_name')
         if 'last_name' in user_data:
             instance.user.last_name = user_data['last_name']
-        instance.user.save()
+            user_fields_to_update.append('last_name')
+        if user_fields_to_update:
+            instance.user.save(update_fields=user_fields_to_update)
 
         remove_avatar = validated_data.pop('remove_avatar', False)
         if remove_avatar:

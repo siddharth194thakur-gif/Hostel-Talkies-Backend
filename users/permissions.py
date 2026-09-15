@@ -6,7 +6,7 @@ class IsNotBlockedOrSuspended(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
-            return True
+            return False
         if getattr(request.user, 'is_blocked', False):
             return False
         if getattr(request.user, 'is_currently_suspended', lambda: False)():

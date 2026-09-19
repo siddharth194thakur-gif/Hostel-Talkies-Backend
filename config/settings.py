@@ -190,24 +190,27 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Email Configuration
+# Email Configuration (Loaded strictly from environment variables)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com').strip()
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587') or 587)
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '').strip()
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '').strip()
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com').strip()
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
 
 env_from = os.environ.get('DEFAULT_FROM_EMAIL', '').strip()
-if env_from and 'no-reply@hosteltalkies.com' not in env_from:
+if env_from:
     DEFAULT_FROM_EMAIL = env_from
 elif EMAIL_HOST_USER:
     DEFAULT_FROM_EMAIL = f'HostelTalkies <{EMAIL_HOST_USER}>'
 else:
     DEFAULT_FROM_EMAIL = 'HostelTalkies <no-reply@hosteltalkies.com>'
 
-# Use SMTP if credentials are provided, otherwise fallback to console backend in debug mode
-if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+# Use SMTP if credentials are provided, allow explicit EMAIL_BACKEND override, fallback to console backend in debug mode
+env_backend = os.environ.get('EMAIL_BACKEND', '').strip()
+if env_backend:
+    EMAIL_BACKEND = env_backend
+elif EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 elif DEBUG:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

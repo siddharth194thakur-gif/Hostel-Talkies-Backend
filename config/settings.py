@@ -98,7 +98,19 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Supports:
 # 1. Individual PostgreSQL environment variables (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
 # 2. DATABASE_URL (via dj_database_url or urllib with SSL support)
-# 3. Default fallback to local SQLite for development
+# 3. Automatic fallback to SQLite if remote PostgreSQL is unreachable (prevents downtime)
+import urllib.parse
+import socket
+
+def is_remote_db_reachable(host, port=5432, timeout=2):
+    if not host or host in ('localhost', '127.0.0.1', '0.0.0.0'):
+        return True
+    try:
+        with socket.create_connection((host, int(port or 5432)), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
 DB_NAME = os.environ.get('DB_NAME')
 DB_USER = os.environ.get('DB_USER')
 DB_PASSWORD = os.environ.get('DB_PASSWORD')
@@ -106,55 +118,53 @@ DB_HOST = os.environ.get('DB_HOST')
 DB_PORT = os.environ.get('DB_PORT', '5432')
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
+db_configured = False
+
 if DB_NAME and (DB_HOST or DB_USER):
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': DB_NAME,
-            'USER': DB_USER or '',
-            'PASSWORD': DB_PASSWORD or '',
-            'HOST': DB_HOST or 'localhost',
-            'PORT': DB_PORT or '5432',
-            'CONN_MAX_AGE': 600,
-        }
-    }
-    if DB_HOST and DB_HOST not in ('localhost', '127.0.0.1', '0.0.0.0'):
-        DATABASES['default']['OPTIONS'] = {
-            'sslmode': os.environ.get('DB_SSLMODE', 'require')
-        }
-elif DATABASE_URL:
-    try:
-        import dj_database_url
-        is_remote_db = not any(local in DATABASE_URL for local in ('localhost', '127.0.0.1', 'sqlite'))
-        ssl_require = is_remote_db and (os.environ.get('DB_SSL_REQUIRE', 'True').lower() in ('true', '1', 'yes'))
-        DATABASES = {
-            'default': dj_database_url.config(
-                default=DATABASE_URL,
-                conn_max_age=600,
-                conn_health_checks=True,
-                ssl_require=ssl_require,
-            )
-        }
-    except ImportError:
-        import urllib.parse
-        parsed = urllib.parse.urlparse(DATABASE_URL)
-        engine = 'django.db.backends.postgresql' if parsed.scheme in ['postgres', 'postgresql'] else 'django.db.backends.sqlite3'
+    if is_remote_db_reachable(DB_HOST, DB_PORT):
         DATABASES = {
             'default': {
-                'ENGINE': engine,
-                'NAME': parsed.path.lstrip('/'),
-                'USER': parsed.username or '',
-                'PASSWORD': parsed.password or '',
-                'HOST': parsed.hostname or '',
-                'PORT': parsed.port or '',
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': DB_NAME,
+                'USER': DB_USER or '',
+                'PASSWORD': DB_PASSWORD or '',
+                'HOST': DB_HOST or 'localhost',
+                'PORT': DB_PORT or '5432',
                 'CONN_MAX_AGE': 600,
             }
         }
-        if engine == 'django.db.backends.postgresql' and parsed.hostname not in ('localhost', '127.0.0.1', None, ''):
+        if DB_HOST and DB_HOST not in ('localhost', '127.0.0.1', '0.0.0.0'):
             DATABASES['default']['OPTIONS'] = {
                 'sslmode': os.environ.get('DB_SSLMODE', 'require')
             }
-else:
+        db_configured = True
+    else:
+        print(f"[Database Notice] PostgreSQL host {DB_HOST} is currently unreachable. Using fallback database.")
+
+if not db_configured and DATABASE_URL:
+    try:
+        parsed = urllib.parse.urlparse(DATABASE_URL)
+        db_host = parsed.hostname
+        db_port = parsed.port or 5432
+        if is_remote_db_reachable(db_host, db_port):
+            import dj_database_url
+            is_remote_db = not any(local in DATABASE_URL for local in ('localhost', '127.0.0.1', 'sqlite'))
+            ssl_require = is_remote_db and (os.environ.get('DB_SSL_REQUIRE', 'True').lower() in ('true', '1', 'yes'))
+            DATABASES = {
+                'default': dj_database_url.config(
+                    default=DATABASE_URL,
+                    conn_max_age=600,
+                    conn_health_checks=True,
+                    ssl_require=ssl_require,
+                )
+            }
+            db_configured = True
+        else:
+            print(f"[Database Notice] Remote database at {db_host} is unreachable. Using fallback database.")
+    except Exception as exc:
+        print(f"[Database Notice] Error configuring DATABASE_URL ({exc}). Using fallback database.")
+
+if not db_configured:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',

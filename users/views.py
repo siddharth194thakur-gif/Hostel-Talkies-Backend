@@ -54,7 +54,15 @@ class LoginView(views.APIView):
         else:
             user = User.objects.filter(username__iexact=email_or_username).first()
 
-        if not user or not user.check_password(password):
+        # Check password with graceful fallback for mobile auto-capitalization
+        password_valid = user.check_password(password) if user else False
+        if not password_valid and user:
+            if user.check_password(password.capitalize()):
+                password_valid = True
+            elif user.check_password(password.lower()):
+                password_valid = True
+
+        if not user or not password_valid:
             return Response({'detail': 'Invalid email/username or password.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         if not user.is_active:

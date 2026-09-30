@@ -1,12 +1,17 @@
-from rest_framework import viewsets, permissions, generics
+import logging
+from rest_framework import viewsets, permissions, generics, status
 from rest_framework.response import Response
+from django.db import DatabaseError
 from .models import Hostel, Block, Room
 from .serializers import HostelSerializer, HostelDetailSerializer, BlockSerializer, RoomSerializer
 from users.permissions import IsAdminOrReadOnly
 
+logger = logging.getLogger(__name__)
+
 class HostelViewSet(viewsets.ModelViewSet):
     queryset = Hostel.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAdminOrReadOnly]
+    pagination_class = None
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -18,6 +23,21 @@ class HostelViewSet(viewsets.ModelViewSet):
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_hostel_admin', False)):
             return Hostel.objects.all().order_by('name')
         return Hostel.objects.filter(is_active=True).order_by('name')
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except (DatabaseError, Exception) as e:
+            logger.error("Failed to retrieve hostels: %s", e)
+            return Response(
+                {
+                    "detail": "Unable to retrieve hostels from database. Please retry shortly.",
+                    "results": []
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
 
 class BlockViewSet(viewsets.ModelViewSet):

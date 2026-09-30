@@ -95,16 +95,44 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
-# Default: SQLite (auto-switches to PostgreSQL when DATABASE_URL is provided)
+# Supports:
+# 1. Individual PostgreSQL environment variables (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
+# 2. DATABASE_URL (via dj_database_url or urllib with SSL support)
+# 3. Default fallback to local SQLite for development
+DB_NAME = os.environ.get('DB_NAME')
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_HOST = os.environ.get('DB_HOST')
+DB_PORT = os.environ.get('DB_PORT', '5432')
 DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
+
+if DB_NAME and (DB_HOST or DB_USER):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': DB_NAME,
+            'USER': DB_USER or '',
+            'PASSWORD': DB_PASSWORD or '',
+            'HOST': DB_HOST or 'localhost',
+            'PORT': DB_PORT or '5432',
+            'CONN_MAX_AGE': 600,
+        }
+    }
+    if DB_HOST and DB_HOST not in ('localhost', '127.0.0.1', '0.0.0.0'):
+        DATABASES['default']['OPTIONS'] = {
+            'sslmode': os.environ.get('DB_SSLMODE', 'require')
+        }
+elif DATABASE_URL:
     try:
         import dj_database_url
+        is_remote_db = not any(local in DATABASE_URL for local in ('localhost', '127.0.0.1', 'sqlite'))
+        ssl_require = is_remote_db and (os.environ.get('DB_SSL_REQUIRE', 'True').lower() in ('true', '1', 'yes'))
         DATABASES = {
             'default': dj_database_url.config(
                 default=DATABASE_URL,
                 conn_max_age=600,
                 conn_health_checks=True,
+                ssl_require=ssl_require,
             )
         }
     except ImportError:
@@ -122,6 +150,10 @@ if DATABASE_URL:
                 'CONN_MAX_AGE': 600,
             }
         }
+        if engine == 'django.db.backends.postgresql' and parsed.hostname not in ('localhost', '127.0.0.1', None, ''):
+            DATABASES['default']['OPTIONS'] = {
+                'sslmode': os.environ.get('DB_SSLMODE', 'require')
+            }
 else:
     DATABASES = {
         'default': {

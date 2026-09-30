@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
-from .models import Hostel, Block, Room
+from hostels.models import Hostel, Block, Room
 
 User = get_user_model()
 

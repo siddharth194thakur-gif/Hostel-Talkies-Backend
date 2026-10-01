@@ -54,9 +54,9 @@ class LoginView(views.APIView):
         else:
             user = User.objects.filter(username__iexact=email_or_username).first()
 
-        # Check password with graceful fallback for mobile auto-capitalization
+        # Check password with graceful fallback for mobile auto-capitalization on student accounts
         password_valid = user.check_password(password) if user else False
-        if not password_valid and user:
+        if not password_valid and user and not (user.is_staff or user.is_superuser):
             if user.check_password(password.capitalize()):
                 password_valid = True
             elif user.check_password(password.lower()):
@@ -163,8 +163,10 @@ class UnblockUserView(views.APIView):
     def post(self, request, pk):
         target_user = get_object_or_404(User, pk=pk)
         deleted_count, _ = UserBlock.objects.filter(blocker=request.user, blocked=target_user).delete()
+        target_name = target_user.get_full_name() or target_user.username
+        detail_msg = f'You have unblocked {target_name}.' if deleted_count > 0 else f'{target_name} is not in your blocked list.'
         return Response({
-            'detail': f'You have unblocked {target_user.get_full_name() or target_user.username}.',
+            'detail': detail_msg,
             'is_blocked_by_me': False,
         }, status=status.HTTP_200_OK)
 
@@ -189,7 +191,7 @@ class AdminDashboardStatsView(views.APIView):
         from moderation.models import Report, Feedback, AdminActionLog
         from hostels.models import Hostel
 
-        total_students = User.objects.count()
+        total_students = User.objects.filter(is_student=True).count()
         total_posts = Post.objects.count()
         pending_reports = Report.objects.filter(status='pending').count()
         total_reports = Report.objects.count()

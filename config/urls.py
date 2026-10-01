@@ -285,7 +285,6 @@ class GlobalSearchView(views.APIView):
         # 7. Gaming Competitions (safe optional query)
         comp_list = []
         try:
-            from gaming.models import Competition
             competition_filter = (
                 Q(name__icontains=query) |
                 Q(game__icontains=query) |

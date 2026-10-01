@@ -126,9 +126,9 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        # Increment views atomically
+        # Increment views atomically, then refresh from DB so the serialized count is accurate
         Post.objects.filter(id=instance.id).update(views_count=F('views_count') + 1)
-        instance.views_count += 1
+        instance.refresh_from_db(fields=['views_count'])
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -243,18 +243,27 @@ class BorrowRequestUpdateView(generics.UpdateAPIView):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        # Only post owner can accept/reject; borrower or owner can mark returned
         new_status = request.data.get('status')
+
+        # Validate new_status is a known valid value
+        valid_statuses = [choice[0] for choice in BorrowRequest.STATUS_CHOICES]
+        if not new_status or new_status not in valid_statuses:
+            return Response(
+                {'detail': f"Invalid status. Must be one of: {', '.join(valid_statuses)}."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Only post owner can accept/reject; borrower or owner can mark returned
         if new_status in ['accepted', 'rejected'] and instance.post.author != request.user and not request.user.is_staff:
             return Response({'detail': 'Only the item owner can accept or reject requests.'}, status=status.HTTP_403_FORBIDDEN)
-        
+
         if new_status == 'returned' and instance.post.author != request.user and instance.borrower != request.user:
             return Response({'detail': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
 
         instance.status = new_status
-        instance.save()
+        instance.save(update_fields=['status', 'updated_at'])
 
-        # Notify borrower
+        # Notify borrower when owner updates status
         if instance.post.author == request.user:
             Notification.objects.create(
                 recipient=instance.borrower,

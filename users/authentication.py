@@ -1,4 +1,6 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import permissions
 
 class LenientJWTAuthentication(JWTAuthentication):
@@ -28,7 +30,7 @@ class LenientJWTAuthentication(JWTAuthentication):
         try:
             validated_token = self.get_validated_token(raw_token)
             return self.get_user(validated_token), validated_token
-        except Exception:
+        except (InvalidToken, TokenError, AuthenticationFailed):
             path = getattr(request, 'path', '')
             # If safe read-only method or public auth endpoint, gracefully fallback to AnonymousUser
             if (

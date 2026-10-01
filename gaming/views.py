@@ -121,31 +121,36 @@ class CompetitionViewSet(viewsets.ModelViewSet):
         team_members = request.data.get('team_members', '').strip()
         contact_number = request.data.get('contact_number', '').strip()
 
-        slot_number = competition.participants_count + 1
+        from django.db import transaction
+        with transaction.atomic():
+            # Count currently registered participants inside the atomic block to prevent race conditions
+            slot_number = CompetitionParticipant.objects.select_for_update().filter(
+                competition=competition, status='registered'
+            ).count() + 1
 
-        # Check existing participant record if previously left
-        participant = CompetitionParticipant.objects.filter(competition=competition, user=user).first()
-        if participant:
-            participant.in_game_name = in_game_name
-            participant.game_uid = game_uid
-            participant.team_name = team_name
-            participant.team_members = team_members
-            participant.contact_number = contact_number
-            participant.slot_number = slot_number
-            participant.status = 'registered'
-            participant.save()
-        else:
-            participant = CompetitionParticipant.objects.create(
-                competition=competition,
-                user=user,
-                in_game_name=in_game_name,
-                game_uid=game_uid,
-                team_name=team_name,
-                team_members=team_members,
-                contact_number=contact_number,
-                slot_number=slot_number,
-                status='registered'
-            )
+            # Check existing participant record if previously left
+            participant = CompetitionParticipant.objects.filter(competition=competition, user=user).first()
+            if participant:
+                participant.in_game_name = in_game_name
+                participant.game_uid = game_uid
+                participant.team_name = team_name
+                participant.team_members = team_members
+                participant.contact_number = contact_number
+                participant.slot_number = slot_number
+                participant.status = 'registered'
+                participant.save()
+            else:
+                participant = CompetitionParticipant.objects.create(
+                    competition=competition,
+                    user=user,
+                    in_game_name=in_game_name,
+                    game_uid=game_uid,
+                    team_name=team_name,
+                    team_members=team_members,
+                    contact_number=contact_number,
+                    slot_number=slot_number,
+                    status='registered'
+                )
 
         serializer = self.get_serializer(competition, context={'request': request})
         return Response(
@@ -223,7 +228,7 @@ class CompetitionViewSet(viewsets.ModelViewSet):
 
         competition.is_registration_closed_by_organizer = not competition.is_registration_closed_by_organizer
         competition.save()
-        
+
         state_msg = "closed" if competition.is_registration_closed_by_organizer else "re-opened"
         serializer = self.get_serializer(competition, context={'request': request})
         return Response(
@@ -250,6 +255,18 @@ class CompetitionViewSet(viewsets.ModelViewSet):
         if not participant:
             return Response(
                 {'detail': 'You are not registered in this competition.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Prevent duplicate active results (pending or approved) for the same participant
+        existing_result = CompetitionResult.objects.filter(
+            competition=competition,
+            participant=participant,
+            verification_status__in=['pending', 'approved']
+        ).first()
+        if existing_result and not is_organizer:
+            return Response(
+                {'detail': 'You have already submitted a result for this competition. Wait for verification before resubmitting.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

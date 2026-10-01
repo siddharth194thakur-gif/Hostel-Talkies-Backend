@@ -1,4 +1,5 @@
 import os
+import json
 from PIL import Image
 from rest_framework import viewsets, permissions, status, views
 from rest_framework.response import Response
@@ -336,7 +337,6 @@ class CreateGroupView(views.APIView):
         
         # Handle stringified JSON or list
         if isinstance(member_ids_raw, str):
-            import json
             try:
                 member_ids = json.loads(member_ids_raw)
             except Exception:
@@ -429,7 +429,6 @@ class AddGroupMembersView(views.APIView):
         if isinstance(member_ids_raw, (int, float)):
             member_ids = [member_ids_raw]
         elif isinstance(member_ids_raw, str):
-            import json
             try:
                 member_ids = json.loads(member_ids_raw)
                 if not isinstance(member_ids, list):
@@ -497,14 +496,24 @@ class LeaveGroupView(views.APIView):
 
     def post(self, request, group_id):
         group = get_object_or_404(Conversation, id=group_id, is_group=True, participants=request.user)
+        was_admin = (group.group_admin_id == request.user.id)
         group.participants.remove(request.user)
 
         # If admin leaves, transfer admin to another participant if available
-        if group.group_admin_id == request.user.id:
+        if was_admin:
             remaining = group.participants.first()
             if remaining:
                 group.group_admin = remaining
                 group.save()
+                # Notify the new admin that they've been promoted
+                Notification.objects.create(
+                    recipient=remaining,
+                    sender=request.user,
+                    notification_type='message',
+                    title='You are now the Group Admin',
+                    message=f"You have been promoted to admin of '{group.group_name}' because the previous admin left.",
+                    link=f"/messages/{group.id}"
+                )
             else:
                 group.delete()
                 return Response({'detail': 'You have left the group. The empty group was deleted.'}, status=status.HTTP_200_OK)
@@ -517,7 +526,14 @@ class AvailableMembersView(views.APIView):
 
     def get(self, request):
         search = request.query_params.get('search', '').strip()
+        # Exclude admin-blocked users AND users that the current user has personally blocked
+        personally_blocked_ids = set(
+            UserBlock.objects.filter(blocker=request.user).values_list('blocked_id', flat=True)
+        )
         qs = User.objects.filter(is_active=True, is_blocked=False).exclude(id=request.user.id)
+        if personally_blocked_ids:
+            qs = qs.exclude(id__in=personally_blocked_ids)
+
         if search:
             clean_user_query = search.lstrip('@').strip()
             clean_id = clean_user_query.lstrip('#')

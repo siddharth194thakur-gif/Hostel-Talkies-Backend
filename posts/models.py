@@ -27,7 +27,7 @@ class Category(models.Model):
         ordering = ['name']
 
     def save(self, *args, **kwargs):
-        if not self.slug:
+        if not self.slug or (self.pk and Category.objects.filter(pk=self.pk).values_list('name', flat=True).first() != self.name):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 

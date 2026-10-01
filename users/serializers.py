@@ -240,6 +240,22 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
             'remove_avatar'
         ]
 
+    def validate(self, attrs):
+        hostel = attrs.get('hostel', self.instance.hostel if self.instance else None)
+        block = attrs.get('block', self.instance.block if self.instance else None)
+        room = attrs.get('room', self.instance.room if self.instance else None)
+
+        if block and hostel and block.hostel != hostel:
+            raise serializers.ValidationError({'block': f"The selected block '{block.name}' does not belong to {hostel.name}."})
+
+        if room and block and room.block != block:
+            raise serializers.ValidationError({'room': f"The selected room '{room.room_number}' does not belong to {block.name}."})
+
+        if room and not block:
+            raise serializers.ValidationError({'room': "You must select a block before selecting a room."})
+
+        return attrs
+
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})
         user_fields_to_update = []
